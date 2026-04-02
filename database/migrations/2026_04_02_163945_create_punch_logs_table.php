@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('user_id');
             $table->dateTime('timestamp');
             $table->tinyInteger('status')->default(0);      // optimized
-            $table->tinyInteger('verify_type')->default(0); // optimized
+            $table->string('verify_type')->default(0); // optimized
             $table->integer('stamp');
             $table->timestamps();
 
