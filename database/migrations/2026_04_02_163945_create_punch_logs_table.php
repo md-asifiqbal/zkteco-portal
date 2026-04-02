@@ -37,6 +37,13 @@ return new class extends Migration
             MODIFY id BIGINT UNSIGNED AUTO_INCREMENT,
             ADD PRIMARY KEY (id, timestamp)
         ');
+
+        //         ALTER TABLE punch_logs
+        // PARTITION BY RANGE (TO_DAYS(timestamp)) (
+        //     PARTITION p_init VALUES LESS THAN (TO_DAYS('2026-01-01')),
+        //     PARTITION pmax VALUES LESS THAN MAXVALUE
+        // );
+        // php artisan migrate --path=database/migrations_logs
     }
 
     public function down(): void
