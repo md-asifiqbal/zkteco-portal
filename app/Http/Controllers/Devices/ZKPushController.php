@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ZkTecos\ProcessZKPushJob;
 use App\Models\Device;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ZKPushController extends Controller
 {
@@ -13,7 +14,7 @@ class ZKPushController extends Controller
     {
         $sn = $request->query('SN');
 
-        info("Received push from SN: {$sn}", [
+        Log::info("Received push from SN: {$sn}", [
             'query' => $request->query(),
             'content' => $request->getContent(),
         ]);
