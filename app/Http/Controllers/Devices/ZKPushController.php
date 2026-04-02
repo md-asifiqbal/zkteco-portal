@@ -13,6 +13,11 @@ class ZKPushController extends Controller
     {
         $sn = $request->query('SN');
 
+        info("Received push from SN: {$sn}", [
+            'query' => $request->query(),
+            'content' => $request->getContent(),
+        ]);
+
         $device = Device::where('serial_number', $sn)->first();
 
         if (! $device) {
