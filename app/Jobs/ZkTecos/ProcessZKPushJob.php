@@ -37,8 +37,8 @@ class ProcessZKPushJob implements ShouldQueue
                 'user_id' => $cols[0],
                 'timestamp' => $cols[1],
                 'stamp' => $this->stamp,
-                'verify_type' => $cols[2] ?? '0',
-                'status' => $cols[3] ?? '0',
+                'verify_type' => $cols[2] ?? 0,
+                'status' => $cols[3] ?? 0,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
