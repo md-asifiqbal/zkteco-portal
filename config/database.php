@@ -64,7 +64,7 @@ return [
             ]) : [],
         ],
 
-        'logdb' => [
+        'logs_db' => [
             'driver' => 'mysql',
             'url' => env('LOG_DB_URL'),
             'host' => env('LOG_DB_HOST', '127.0.0.1'),

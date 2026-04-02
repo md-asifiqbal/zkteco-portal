@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    protected $connection = 'logs_db';
+
     /**
      * Run the migrations.
      */
@@ -13,8 +15,8 @@ return new class extends Migration
     {
         Schema::create('punch_logs', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('device_id')->constrained('devices')->onDelete('cascade');
-            $table->foreignId('tenant_id')->constrained('tenants')->onDelete('cascade');
+            $table->unsignedBigInteger('device_id')->index();
+            $table->unsignedBigInteger('tenant_id')->index();
             $table->string('user_id');     // Employee ID from device
             $table->dateTime('timestamp'); // Time of punch
             $table->string('status');      // In/Out
@@ -24,6 +26,10 @@ return new class extends Migration
 
             // Prevent duplicates at the database level
             $table->unique(['device_id', 'user_id', 'timestamp']);
+            $table->index(['tenant_id', 'timestamp']);
+            $table->index(['device_id', 'stamp']);
+            $table->index(['user_id']);
+
         });
     }
 
