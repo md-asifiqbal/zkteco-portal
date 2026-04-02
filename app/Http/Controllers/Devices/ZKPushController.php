@@ -8,9 +8,10 @@ use Illuminate\Support\Facades\Log;
 
 class ZKPushController extends Controller
 {
-    public function handle(Request $request)
+    public function handle(Request $request, $path = null)
     {
         Log::info('ZK Request', [
+            'path' => $path,
             'method' => $request->method(),
             'query' => $request->query(),
             'body' => $request->getContent(),
