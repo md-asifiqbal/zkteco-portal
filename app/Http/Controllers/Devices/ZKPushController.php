@@ -14,6 +14,7 @@ class ZKPushController extends Controller
             'method' => $request->method(),
             'query' => $request->query(),
             'body' => $request->getContent(),
+            'data' => $request->all(),
         ]);
 
         if ($request->query('table') === 'ATTLOG') {
