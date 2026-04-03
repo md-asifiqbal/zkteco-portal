@@ -33,7 +33,7 @@ class PullLogsFromDevice extends Command
     public function sync(Device $device)
     {
         dump($device->ip_address);
-        $client = new ZKTecoClient($device->ip_address);
+        $client = new ZKTecoClient($device->ip_address,8898);
         $parser = new ZKTecoParser;
 
         $service = new ZKTecoService($client, $parser);
