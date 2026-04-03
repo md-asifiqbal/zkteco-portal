@@ -10,7 +10,7 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
-#[Signature('app:pull-logs-from-device')]
+#[Signature('app:pull-logs-from-device {device_id}')]
 #[Description('Command description')]
 class PullLogsFromDevice extends Command
 {
@@ -19,7 +19,7 @@ class PullLogsFromDevice extends Command
      */
     public function handle()
     {
-        $device = Device::first();
+        $device = Device::where('id', $this->argument('device_id'))->first();
 
         if (! $device) {
             $this->error('No device found');
@@ -33,7 +33,7 @@ class PullLogsFromDevice extends Command
     public function sync(Device $device)
     {
         dump($device->ip_address);
-        $client = new ZKTecoClient($device->ip_address,8898);
+        $client = new ZKTecoClient($device->ip_address, 8898);
         $parser = new ZKTecoParser;
 
         $service = new ZKTecoService($client, $parser);
