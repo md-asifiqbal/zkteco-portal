@@ -5,77 +5,63 @@ namespace App\Services\ZKTeco;
 class ZKTecoClient
 {
     protected $ip;
-
     protected $port;
-
     protected $socket;
-
     protected $session_id = 0;
-
     protected $reply_id = 0;
 
-    protected $comm_key;
-
     const CMD_CONNECT = 1000;
-
     const CMD_EXIT = 1001;
-
     const CMD_ATTLOG_RRQ = 13;
-
     const CMD_PREPARE_DATA = 1500;
-
     const CMD_DATA = 1501;
-
     const CMD_FREE_DATA = 1502;
-
     const CMD_ACK = 2000;
 
-    public function __construct($ip, $port = 4370, $comm_key = 0)
+    public function __construct($ip, $port = 4370)
     {
         $this->ip = $ip;
         $this->port = $port;
-        $this->comm_key = $comm_key;
     }
 
-    // 🔢 CHECKSUM
-    protected function checksum($packet)
+    /**
+     * Calculate the 16-bit Checksum required by ZK protocol
+     */
+    protected function createChecksum($payload)
     {
-        $chksum = 0;
-        $length = strlen($packet);
-
-        for ($i = 0; $i < $length; $i += 2) {
-            $chksum += ord($packet[$i]) + ((ord($packet[$i + 1] ?? 0)) << 8);
-            $chksum = $chksum & 0xFFFF;
+        $acc = 0;
+        if (strlen($payload) % 2 != 0) {
+            $payload .= "\x00";
         }
 
-        return (~$chksum + 1) & 0xFFFF;
+        $words = unpack('v*', $payload);
+
+        foreach ($words as $word) {
+            $acc += $word;
+            if ($acc > 0xffff) {
+                $acc -= 0xffff;
+            }
+        }
+
+        return ~$acc & 0xffff;
     }
 
-    // 🔌 CONNECT
     public function connect()
     {
-        $this->socket = stream_socket_client(
-            "udp://{$this->ip}:{$this->port}",
-            $errno,
-            $errstr,
-            5
-        );
+        // Use UDP (udp://) as it is the default for the ZK binary protocol
+        $this->socket = fsockopen("udp://" . $this->ip, $this->port, $errno, $errstr, 5);
 
-        if (! $this->socket) {
-            throw new \Exception("Connection failed: $errstr ($errno)");
+        if (!$this->socket) {
+            throw new \Exception("ZKTeco Connection failed: $errstr ($errno)");
         }
 
-        stream_set_timeout($this->socket, 3);
+        stream_set_timeout($this->socket, 5);
 
-        // 🔥 include comm key
-        $data = pack('V', $this->comm_key);
-
-        $this->send(self::CMD_CONNECT, $data);
-
+        $this->send(self::CMD_CONNECT);
         $res = $this->receive();
 
-        if (! $res || strlen($res) < 8) {
-            throw new \Exception('No response (wrong comm key / UDP issue)');
+        if (empty($res) || strlen($res) < 8) {
+            throw new \Exception("No response from device. Check if Port 4370 is open or if a Comm Key (Password) is set on the device.");
         }
 
         $header = unpack('vcommand/vchecksum/vsession/vreply', substr($res, 0, 8));
@@ -84,50 +70,46 @@ class ZKTecoClient
         return true;
     }
 
-    // 🔌 DISCONNECT
     public function disconnect()
     {
         $this->send(self::CMD_EXIT);
-        fclose($this->socket);
+        if ($this->socket) {
+            fclose($this->socket);
+        }
     }
 
-    // 📤 SEND
     protected function send($command, $data = '')
     {
+        // Increment reply ID for every packet sent
         $this->reply_id++;
+        if ($this->reply_id >= 0xffff) {
+            $this->reply_id = 0;
+        }
 
-        $packet = pack('vvvv', $command, 0, $this->session_id, $this->reply_id).$data;
+        // 1. Pack with 0 checksum to calculate the real one
+        $buf = pack('vvvv', $command, 0, $this->session_id, $this->reply_id) . $data;
 
-        $checksum = $this->checksum($packet);
+        // 2. Calculate Checksum
+        $checksum = $this->createChecksum($buf);
 
-        $packet = pack('vvvv', $command, $checksum, $this->session_id, $this->reply_id).$data;
+        // 3. Final Packet
+        $packet = pack('vvvv', $command, $checksum, $this->session_id, $this->reply_id) . $data;
 
         fwrite($this->socket, $packet);
     }
 
-    // 📥 RECEIVE (UDP safe)
     protected function receive()
     {
-        $read = [$this->socket];
-        $write = $except = [];
-
-        $data = '';
-
-        if (stream_select($read, $write, $except, 3)) {
-            $data = fread($this->socket, 65535);
-        }
-
+        $data = fread($this->socket, 65535);
         return $data;
     }
 
-    // 📊 FETCH LOGS
     public function fetchAttendanceRaw()
     {
         $this->send(self::CMD_ATTLOG_RRQ);
-
         $response = $this->receive();
 
-        if (! $response || strlen($response) < 8) {
+        if (empty($response) || strlen($response) < 8) {
             return null;
         }
 
@@ -140,15 +122,13 @@ class ZKTecoClient
         return substr($response, 8);
     }
 
-    // 📦 MULTI PACKET
     protected function readMultiPacket()
     {
         $data = '';
 
         while (true) {
             $res = $this->receive();
-
-            if (! $res || strlen($res) < 8) {
+            if (!$res || strlen($res) < 8) {
                 break;
             }
 
@@ -159,7 +139,8 @@ class ZKTecoClient
                 $data .= $body;
             }
 
-            if ($header['command'] == self::CMD_FREE_DATA) {
+            // Once we get FREE_DATA, the device is done sending the log buffer
+            if ($header['command'] == self::CMD_FREE_DATA || $header['command'] == self::CMD_ACK) {
                 break;
             }
         }
