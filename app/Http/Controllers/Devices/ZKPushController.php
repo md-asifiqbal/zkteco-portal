@@ -6,15 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ZkTecos\ProcessZKPushJob;
 use App\Models\Device;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class ZKPushController extends Controller
 {
     public function handle(Request $request)
     {
         $sn = $request->query('SN');
-
-        
 
         $device = Device::where('serial_number', $sn)->first();
 
@@ -36,7 +33,7 @@ class ZKPushController extends Controller
             dispatch(new ProcessZKPushJob(
                 $device->id,
                 $device->tenant_id,
-                $request->getContent(),
+                $content,
                 (int) $request->query('Stamp', 0)
             ));
         }
