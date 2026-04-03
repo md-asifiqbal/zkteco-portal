@@ -40,6 +40,11 @@ class PullLogsFromDevice extends Command
 
         $logs = $service->syncAttendance($device->id);
 
+        foreach ($logs as $log) {
+
+            dd($log);
+        }
+
         dd($logs);
 
         return response()->json(['count' => count($logs)]);
