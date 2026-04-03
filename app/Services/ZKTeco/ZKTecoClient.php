@@ -9,12 +9,10 @@ class ZKTecoClient
     protected $socket;
     protected $session_id = 0;
     protected $reply_id = 0;
-    protected $is_tcp = true; // Most newer devices on 4370 use TCP
 
     const CMD_CONNECT = 1000;
     const CMD_EXIT = 1001;
     const CMD_ATTLOG_RRQ = 13;
-    const CMD_AUTH = 1102;
     const CMD_PREPARE_DATA = 1500;
     const CMD_DATA = 1501;
     const CMD_FREE_DATA = 1502;
@@ -27,66 +25,47 @@ class ZKTecoClient
     }
 
     /**
-     * Logic for hashing the Comm Key (Password)
+     * Calculate the 16-bit Checksum required by ZK protocol
      */
-    protected function makeCommKey($key, $session_id)
-    {
-        $res = 0;
-        $key = (int)$key;
-        for ($i = 0; $i < 32; $i++) {
-            if ($key & (1 << $i)) {
-                $res |= (1 << (31 - $i));
-            }
-        }
-        return $res ^ $session_id;
-    }
-
     protected function createChecksum($payload)
     {
         $acc = 0;
         if (strlen($payload) % 2 != 0) {
             $payload .= "\x00";
         }
+
         $words = unpack('v*', $payload);
+
         foreach ($words as $word) {
             $acc += $word;
             if ($acc > 0xffff) {
                 $acc -= 0xffff;
             }
         }
+
         return ~$acc & 0xffff;
     }
 
-    /**
-     * Connect with optional 6-digit Comm Key
-     */
-    public function connect($commKey = 0)
+    public function connect()
     {
-        // Try TCP by default for port 4370. Switch to "udp://" if your device is legacy.
-        $protocol = $this->is_tcp ? "tcp://" : "udp://";
-        $this->socket = fsockopen($protocol . $this->ip, $this->port, $errno, $errstr, 5);
+        // Use UDP (udp://) as it is the default for the ZK binary protocol
+        $this->socket = fsockopen("udp://" . $this->ip, $this->port, $errno, $errstr, 5);
 
         if (!$this->socket) {
-            throw new \Exception("ZKTeco Connection failed: $errstr");
+            throw new \Exception("ZKTeco Connection failed: $errstr ($errno)");
         }
 
         stream_set_timeout($this->socket, 5);
 
-        // 1. Initial Connection Request
         $this->send(self::CMD_CONNECT);
         $res = $this->receive();
 
-        if (empty($res)) {
-            throw new \Exception("Device refused connection. Disable ADMS on device and ensure Comm Key is correct.");
+        if (empty($res) || strlen($res) < 8) {
+            throw new \Exception("No response from device. Check if Port 4370 is open or if a Comm Key (Password) is set on the device.");
         }
 
-        $header = unpack('vcommand/vchecksum/vsession/vreply', $this->is_tcp ? substr($res, 4, 8) : substr($res, 0, 8));
+        $header = unpack('vcommand/vchecksum/vsession/vreply', substr($res, 0, 8));
         $this->session_id = $header['session'];
-
-        // 2. Handle Authentication if Key is set (even if it's 000000)
-        $hashedKey = $this->makeCommKey($commKey, $this->session_id);
-        $this->send(self::CMD_AUTH, pack('V', $hashedKey));
-        $authRes = $this->receive();
 
         return true;
     }
@@ -101,34 +80,28 @@ class ZKTecoClient
 
     protected function send($command, $data = '')
     {
+        // Increment reply ID for every packet sent
         $this->reply_id++;
-        if ($this->reply_id >= 0xffff) $this->reply_id = 0;
-
-        $buf = pack('vvvv', $command, 0, $this->session_id, $this->reply_id) . $data;
-        $checksum = $this->createChecksum($buf);
-        $payload = pack('vvvv', $command, $checksum, $this->session_id, $this->reply_id) . $data;
-
-        if ($this->is_tcp) {
-            // TCP requires a 4-byte length prefix
-            $packet = pack('V', strlen($payload)) . $payload;
-        } else {
-            $packet = $payload;
+        if ($this->reply_id >= 0xffff) {
+            $this->reply_id = 0;
         }
+
+        // 1. Pack with 0 checksum to calculate the real one
+        $buf = pack('vvvv', $command, 0, $this->session_id, $this->reply_id) . $data;
+
+        // 2. Calculate Checksum
+        $checksum = $this->createChecksum($buf);
+
+        // 3. Final Packet
+        $packet = pack('vvvv', $command, $checksum, $this->session_id, $this->reply_id) . $data;
 
         fwrite($this->socket, $packet);
     }
 
     protected function receive()
     {
-        if ($this->is_tcp) {
-            $header = fread($this->socket, 4);
-            if (!$header) return null;
-            $unpack = unpack('Vlen', $header);
-            $info = fread($this->socket, $unpack['len']);
-            return $header . $info;
-        }
-
-        return fread($this->socket, 65535);
+        $data = fread($this->socket, 65535);
+        return $data;
     }
 
     public function fetchAttendanceRaw()
@@ -136,34 +109,37 @@ class ZKTecoClient
         $this->send(self::CMD_ATTLOG_RRQ);
         $response = $this->receive();
 
-        if (empty($response)) return null;
+        if (empty($response) || strlen($response) < 8) {
+            return null;
+        }
 
-        $offset = $this->is_tcp ? 4 : 0;
-        $header = unpack('vcommand', substr($response, $offset, 2));
+        $header = unpack('vcommand/vchecksum/vsession/vreply', substr($response, 0, 8));
 
         if ($header['command'] == self::CMD_PREPARE_DATA) {
             return $this->readMultiPacket();
         }
 
-        return substr($response, $offset + 8);
+        return substr($response, 8);
     }
 
     protected function readMultiPacket()
     {
         $data = '';
-        $offset = $this->is_tcp ? 4 : 0;
 
         while (true) {
             $res = $this->receive();
-            if (!$res) break;
+            if (!$res || strlen($res) < 8) {
+                break;
+            }
 
-            $header = unpack('vcommand', substr($res, $offset, 2));
-            $body = substr($res, $offset + 8);
+            $header = unpack('vcommand/vchecksum/vsession/vreply', substr($res, 0, 8));
+            $body = substr($res, 8);
 
             if ($header['command'] == self::CMD_DATA) {
                 $data .= $body;
             }
 
+            // Once we get FREE_DATA, the device is done sending the log buffer
             if ($header['command'] == self::CMD_FREE_DATA || $header['command'] == self::CMD_ACK) {
                 break;
             }
