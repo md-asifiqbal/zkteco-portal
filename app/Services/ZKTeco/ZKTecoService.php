@@ -2,6 +2,8 @@
 
 namespace App\Services\ZKTeco;
 
+use Illuminate\Support\Facades\Log;
+
 class ZKTecoService
 {
     protected $client;
@@ -19,6 +21,11 @@ class ZKTecoService
         $this->client->connect();
 
         $raw = $this->client->fetchAttendanceRaw();
+        Log::info('Fetched raw attendance data', [
+            'device_id' => $deviceId,
+            'length' => strlen($raw),
+            'hex_sample' => substr(bin2hex($raw), 0, 200),
+        ]);
         $logs = $this->parser->parseAttendance($raw);
 
         $this->client->disconnect();
