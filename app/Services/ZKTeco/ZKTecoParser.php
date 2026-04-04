@@ -7,9 +7,11 @@ use Illuminate\Support\Facades\Log;
 
 class ZKTecoParser
 {
-    protected $recordSizes = [16, 20, 24, 40];
+    protected $recordSizes = [20, 16, 24, 40]; // 🔥 prioritize 20 (your device)
 
-    protected $userIdLengths = [9, 12, 16];
+    protected $userOffsets = [6, 2]; // 🔥 your device uses 6
+
+    protected $userLengths = [12, 9, 16];
 
     public function parse($data)
     {
@@ -70,44 +72,74 @@ class ZKTecoParser
             return null;
         }
 
+        // ✅ UID
         $uid = unpack('v', substr($chunk, 0, 2))[1] ?? null;
 
-        foreach ($this->userIdLengths as $userLen) {
+        // 🔥 Try multiple offsets + lengths
+        foreach ($this->userOffsets as $offset) {
+            foreach ($this->userLengths as $length) {
 
-            if ($len < (2 + $userLen + 6)) {
-                continue;
+                if ($len < ($offset + $length + 6)) {
+                    continue;
+                }
+
+                $user_id = $this->cleanString(substr($chunk, $offset, $length));
+
+                if (! $user_id) {
+                    continue;
+                }
+
+                // 🔍 Try timestamp positions
+                foreach ([12, 14, 16] as $timeIndex) {
+
+                    if (! isset($chunk[$timeIndex + 3])) {
+                        continue;
+                    }
+
+                    $timeRaw = unpack('V', substr($chunk, $timeIndex, 4))[1] ?? null;
+
+                    $timestamp = $this->decodeTime($timeRaw);
+
+                    if (! $this->isValidTime($timestamp)) {
+                        continue;
+                    }
+
+                    $verify = ord($chunk[$timeIndex - 2] ?? 0);
+                    $status = ord($chunk[$timeIndex - 1] ?? 0);
+
+                    return [
+                        'uid' => $uid,
+                        'user_id' => $user_id,
+                        'timestamp' => $timestamp,
+                        'status' => $status,
+                        'verify_type' => $verify,
+                        'stamp' => $this->extractStamp($chunk), // ✅ added
+                        'raw_hex' => bin2hex($chunk),
+                    ];
+                }
             }
+        }
 
-            $user_id = $this->cleanString(substr($chunk, 2, $userLen));
+        return null;
+    }
 
-            if (! $user_id) {
-                continue;
-            }
+    /**
+     * ✅ Extract stamp (last 4 bytes usually)
+     */
+    protected function extractStamp($chunk)
+    {
+        $len = strlen($chunk);
 
-            $verifyIndex = 2 + $userLen;
-            $statusIndex = $verifyIndex + 1;
-            $timeIndex = $statusIndex + 1;
+        if ($len < 4) {
+            return null;
+        }
 
-            if (! isset($chunk[$timeIndex + 3])) {
-                continue;
-            }
+        // try last 4 bytes
+        $stampRaw = unpack('V', substr($chunk, -4))[1] ?? null;
 
-            $timeRaw = unpack('V', substr($chunk, $timeIndex, 4))[1] ?? null;
-
-            $timestamp = $this->decodeTime($timeRaw);
-
-            if (! $this->isValidTime($timestamp)) {
-                continue;
-            }
-
-            return [
-                'uid' => $uid,
-                'user_id' => $user_id,
-                'timestamp' => $timestamp,
-                'status' => ord($chunk[$statusIndex] ?? 0),
-                'verify_type' => ord($chunk[$verifyIndex] ?? 0),
-                'raw_hex' => bin2hex($chunk), // debug ready
-            ];
+        // filter unrealistic values
+        if ($stampRaw && $stampRaw > 0 && $stampRaw < 4294967295) {
+            return $stampRaw;
         }
 
         return null;
@@ -123,22 +155,18 @@ class ZKTecoParser
                 continue;
             }
 
-            // ✔ valid user_id
             if (strlen($r['user_id']) >= 3) {
                 $score += 2;
             }
 
-            // ✔ realistic timestamp
             if ($this->isValidTime($r['timestamp'])) {
                 $score += 3;
             }
 
-            // ✔ valid status
             if ($r['status'] >= 0 && $r['status'] <= 5) {
                 $score += 1;
             }
 
-            // ✔ valid verify_type
             if (in_array($r['verify_type'], [0, 1, 2, 15])) {
                 $score += 1;
             }
