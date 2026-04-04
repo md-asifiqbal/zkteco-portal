@@ -34,5 +34,8 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('partitions:manage')->daily();
+        $schedule->command('device:pull-logs', [
+            '--offline' => true,
+        ])->everyFiveMinutes();
     })
     ->create();

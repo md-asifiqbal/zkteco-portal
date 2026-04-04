@@ -76,6 +76,7 @@ class SyncDeviceLogsJob implements ShouldQueue
                         'source' => 2,
                     ];
                 })
+                ->sortByAsc('timestamp')
                 ->values();
 
             // 🚀 Chunk + upsert
@@ -102,8 +103,14 @@ class SyncDeviceLogsJob implements ShouldQueue
     // 🔥 UTF-8 safe helper
     private function safe($value)
     {
-        return is_string($value)
-            ? iconv('UTF-8', 'UTF-8//IGNORE', $value)
-            : $value;
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        // Remove invalid UTF-8 characters
+        $clean = iconv('UTF-8', 'UTF-8//IGNORE', $value);
+
+        // Remove weird symbols (optional)
+        return preg_replace('/[^\x20-\x7E]/', '', $clean);
     }
 }
