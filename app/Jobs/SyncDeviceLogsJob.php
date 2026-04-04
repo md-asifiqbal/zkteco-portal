@@ -76,7 +76,7 @@ class SyncDeviceLogsJob implements ShouldQueue
                         'source' => 2,
                     ];
                 })
-                ->sortByAsc('timestamp')
+                ->sortBy('timestamp')
                 ->values();
 
             // 🚀 Chunk + upsert
