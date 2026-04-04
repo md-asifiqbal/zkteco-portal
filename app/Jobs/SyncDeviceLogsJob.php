@@ -45,6 +45,8 @@ class SyncDeviceLogsJob implements ShouldQueue
 
             $logs = collect($service->syncAttendance($device->id));
 
+            $device->update(['last_heartbeat' => now()]);
+
             Log::info('Device synced', [
                 'device_id' => $device->id,
                 'count' => $logs->count(),
