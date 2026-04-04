@@ -34,7 +34,7 @@ class SyncDeviceLogsJob implements ShouldQueue
             $parser = new ZKTecoParser;
 
             $service = new ZKTecoService($client, $parser);
-            $logs = $service->syncAttendance($device);
+            $logs = $service->syncAttendance($device->id);
 
             Log::info('Device synced', [
                 'device_id' => $device->id,
