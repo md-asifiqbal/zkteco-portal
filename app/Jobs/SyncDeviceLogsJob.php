@@ -51,16 +51,16 @@ class SyncDeviceLogsJob implements ShouldQueue
             ]);
 
             // 🔹 Get last timestamp
-            // $lastTimestamp = PunchLog::where('device_id', $device->id)
-            //     ->max('timestamp');
+            $lastTimestamp = PunchLog::where('device_id', $device->id)
+                ->max('timestamp');
 
             $now = now();
 
             // 🔥 Clean + filter + transform
             $payload = $logs
-                // ->filter(fn ($log) => isset($log['timestamp']) &&
-                //     (! $lastTimestamp || $log['timestamp'] > $lastTimestamp)
-                // )
+                ->filter(fn ($log) => isset($log['timestamp']) &&
+                    (! $lastTimestamp || $log['timestamp'] > $lastTimestamp)
+                )
                 ->map(function ($log) use ($device, $now) {
 
                     return [
