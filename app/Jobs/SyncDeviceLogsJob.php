@@ -4,9 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Device;
 use App\Models\PunchLog;
-use App\Services\ZKTeco\ZKTecoClient;
-use App\Services\ZKTeco\ZKTecoParser;
-use App\Services\ZKTeco\ZKTecoService;
+use App\Services\ZKTeco\ZKTecoFactory;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Cache;
@@ -27,7 +25,7 @@ class SyncDeviceLogsJob implements ShouldQueue
         $this->deviceId = $deviceId;
     }
 
-    public function handle(): void
+    public function handle(ZKTecoFactory $factory): void
     {
         $device = Device::find($this->deviceId);
 
@@ -43,9 +41,7 @@ class SyncDeviceLogsJob implements ShouldQueue
         }
 
         try {
-            $client = new ZKTecoClient($device->ip_address, $device->port ?? 4370);
-            $parser = new ZKTecoParser;
-            $service = new ZKTecoService($client, $parser);
+            $service = $factory->make($device);
 
             $logs = collect($service->syncAttendance($device->id));
 
