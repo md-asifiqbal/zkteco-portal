@@ -4,15 +4,15 @@ namespace App\Services\ZKTeco;
 
 class ZKTecoClient
 {
-    protected $ip;
+    public $ip;
 
-    protected $port;
+    public $port;
 
-    protected $socket;
+    public $socket;
 
-    protected $session_id = 0;
+    public $session_id = 0;
 
-    protected $reply_id = 0;
+    public $reply_id = 0;
 
     const CMD_CONNECT = 1000;
 
@@ -45,7 +45,7 @@ class ZKTecoClient
     /**
      * Calculate the 16-bit Checksum required by ZK protocol
      */
-    protected function createChecksum($payload)
+    public function createChecksum($payload)
     {
         $acc = 0;
         if (strlen($payload) % 2 != 0) {
@@ -96,7 +96,7 @@ class ZKTecoClient
         }
     }
 
-    protected function send($command, $data = '')
+    public function send($command, $data = '')
     {
         // Increment reply ID for every packet sent
         $this->reply_id++;
@@ -116,7 +116,7 @@ class ZKTecoClient
         fwrite($this->socket, $packet);
     }
 
-    protected function receive()
+    public function receive()
     {
         $data = fread($this->socket, 65535);
 
@@ -141,7 +141,7 @@ class ZKTecoClient
         return substr($response, 8);
     }
 
-    protected function readMultiPacket()
+    public function readMultiPacket()
     {
         $data = '';
 
