@@ -25,7 +25,6 @@ class ZKTecoService
             'device_id' => $deviceId,
             'length' => strlen($raw),
             'hex_sample' => substr(bin2hex($raw), 0, 200),
-            'raw' => $raw,
         ]);
         $logs = $this->parser->parseAttendance($raw);
 
