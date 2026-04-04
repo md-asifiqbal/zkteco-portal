@@ -19,7 +19,7 @@ class PullLogsFromDevice extends Command
         $this->info('Starting device log sync...');
 
         Device::query()
-            ->when(! $offline, function ($query) {
+            ->when($offline, function ($query) {
                 $query->where('is_support_cloud', 0);
             })
             ->chunk(5, function ($devices) {
