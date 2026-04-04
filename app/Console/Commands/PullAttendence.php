@@ -32,7 +32,7 @@ class PullAttendence extends Command
             Log::info('Pulled attendance for device', [
                 'device_id' => $deviceId,
                 'logs_count' => count($logs),
-                'users' => array_map(fn ($log) => $log['user_id'] ?? null, $logs),
+                'users' => $logs,
             ]);
             $this->info("Pulled attendance for device ID {$deviceId}. Logs count: ".count($logs));
         }
