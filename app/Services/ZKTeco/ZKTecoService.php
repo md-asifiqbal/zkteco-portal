@@ -39,7 +39,7 @@ class ZKTecoService
 
             $this->client->disconnect();
 
-            return $this->normalize($deviceId, $logs);
+            return $logs;
 
         } catch (\Throwable $e) {
 
