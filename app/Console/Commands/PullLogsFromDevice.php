@@ -2,45 +2,38 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\SyncDeviceLogsJob;
 use App\Models\Device;
-use App\Services\ZKTeco\ZKTecoClient;
-use App\Services\ZKTeco\ZKTecoParser;
-use App\Services\ZKTeco\ZKTecoService;
-use Illuminate\Console\Attributes\Description;
-use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
-#[Signature('app:pull-logs-from-device {device_id}')]
-#[Description('Command description')]
 class PullLogsFromDevice extends Command
 {
-    /**
-     * Execute the console command.
-     */
-    public function handle()
+    protected $signature = 'device:pull-logs {--offline}';
+
+    protected $description = 'Dispatch log sync jobs for devices';
+
+    public function handle(): int
     {
-        $device = Device::where('id', $this->argument('device_id'))->first();
+        $offline = $this->option('offline');
 
-        if (! $device) {
-            $this->error('No device found');
+        $this->info('Starting device log sync...');
 
-            return;
-        }
+        Device::query()
+            ->when(! $offline, function ($query) {
+                $query->where('is_support_cloud', true);
+            })
+            ->chunk(5, function ($devices) {
 
-        $this->sync($device);
-    }
+                foreach ($devices as $device) {
 
-    public function sync(Device $device)
-    {
-        $client = new ZKTecoClient($device->ip_address);
-        $parser = new ZKTecoParser;
+                    SyncDeviceLogsJob::dispatch($device->id);
 
-        $service = new ZKTecoService($client, $parser);
+                    $this->line("Queued device: {$device->ip_address}");
+                }
+            });
 
-        $logs = $service->syncAttendance($device->id);
+        $this->info('✅ All devices queued.');
 
-        dd($logs);
-
-        return response()->json(['count' => count($logs)]);
+        return Command::SUCCESS;
     }
 }
