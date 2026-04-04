@@ -26,7 +26,7 @@ class ZKTecoService
             'length' => strlen($raw),
             'hex_sample' => substr(bin2hex($raw), 0, 200),
         ]);
-        $logs = $this->parser->parseAttendance($raw);
+        $logs = $this->parser->parse($raw);
 
         $this->client->disconnect();
 

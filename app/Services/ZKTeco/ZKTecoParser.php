@@ -5,7 +5,7 @@ namespace App\Services\ZKTeco;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
-class UniversalZKTecoParser
+class ZKTecoParser
 {
     protected $recordSizes = [16, 20, 24, 40];
 
