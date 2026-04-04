@@ -20,7 +20,7 @@ class PullLogsFromDevice extends Command
 
         Device::query()
             ->when(! $offline, function ($query) {
-                $query->where('is_support_cloud', true);
+                $query->where('is_support_cloud', 0);
             })
             ->chunk(5, function ($devices) {
 
