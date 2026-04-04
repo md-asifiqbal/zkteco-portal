@@ -7,6 +7,7 @@ use App\Services\ZKTeco\ZKTecoFactory;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 
 #[Signature('app:pull-attendence {--device= : Device ID to pull attendance from}')]
 #[Description('Command description')]
@@ -28,7 +29,12 @@ class PullAttendence extends Command
             }
             $service = $factory->make($device);
             $logs = $service->syncUsers();
-            dd(collect($logs)->take(20)->toArray());
+            Log::info('Pulled attendance for device', [
+                'device_id' => $deviceId,
+                'logs_count' => count($logs),
+                'users' => array_map(fn ($log) => $log['user_id'] ?? null, $logs),
+            ]);
+            $this->info("Pulled attendance for device ID {$deviceId}. Logs count: ".count($logs));
         }
 
         return Command::SUCCESS;
