@@ -5,142 +5,146 @@ namespace App\Services\ZKTeco;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
-class ZKTecoParser
+class UniversalZKTecoParser
 {
-    public function parseAttendance($data)
-    {
-        $recordSize = $this->detectRecordSize($data);
+    protected $recordSizes = [16, 20, 24, 40];
 
+    protected $userIdLengths = [9, 12, 16];
+
+    public function parse($data)
+    {
+        $best = [
+            'size' => null,
+            'score' => 0,
+            'records' => [],
+        ];
+
+        foreach ($this->recordSizes as $size) {
+
+            $records = $this->parseWithSize($data, $size);
+
+            $score = $this->scoreRecords($records);
+
+            if ($score > $best['score']) {
+                $best = [
+                    'size' => $size,
+                    'score' => $score,
+                    'records' => $records,
+                ];
+            }
+        }
+
+        Log::info('ZKTeco Parser Selected Format', [
+            'record_size' => $best['size'],
+            'score' => $best['score'],
+            'total_records' => count($best['records']),
+        ]);
+
+        return $best['records'];
+    }
+
+    protected function parseWithSize($data, $size)
+    {
         $records = [];
-        $offset = 0;
         $length = strlen($data);
 
-        while ($offset + $recordSize <= $length) {
+        for ($offset = 0; $offset + $size <= $length; $offset += $size) {
 
-            $chunk = substr($data, $offset, $recordSize);
+            $chunk = substr($data, $offset, $size);
 
-            if (strlen($chunk) < $recordSize) {
-                break;
+            $parsed = $this->parseChunkFlexible($chunk);
+
+            if ($parsed) {
+                $records[] = $parsed;
             }
-
-            try {
-                $parsed = $this->parseChunk($chunk);
-
-                if ($parsed) {
-                    $records[] = $parsed;
-                }
-
-            } catch (\Throwable $e) {
-                Log::warning('Parser error', [
-                    'error' => $e->getMessage(),
-                    'hex' => bin2hex($chunk),
-                ]);
-            }
-
-            $offset += $recordSize;
         }
 
         return $records;
     }
 
-    protected function detectRecordSize($data)
+    protected function parseChunkFlexible($chunk)
     {
-        $length = strlen($data);
+        $len = strlen($chunk);
 
-        foreach ([16, 18, 24, 40] as $size) {
-
-            $valid = 0;
-            $checks = 0;
-
-            for ($i = 0; $i + $size <= $length && $checks < 5; $i += $size) {
-
-                $chunk = substr($data, $i, $size);
-
-                if ($this->looksValidChunk($chunk)) {
-                    $valid++;
-                }
-
-                $checks++;
-            }
-
-            if ($valid >= 3) {
-                return $size;
-            }
-        }
-
-        return 16;
-    }
-
-    protected function looksValidChunk($chunk)
-    {
-        if (strlen($chunk) < 16) {
-            return false;
-        }
-
-        $timeBytes = substr($chunk, 12, 4);
-
-        if (strlen($timeBytes) < 4) {
-            return false;
-        }
-
-        $time = unpack('V', $timeBytes)[1] ?? null;
-
-        return $this->isValidTime($this->decodeTime($time));
-    }
-
-    protected function parseChunk($chunk)
-    {
-        if (strlen($chunk) < 16) {
+        if ($len < 16) {
             return null;
         }
 
         $uid = unpack('v', substr($chunk, 0, 2))[1] ?? null;
 
-        $user_id = $this->cleanString(substr($chunk, 2, 9));
+        foreach ($this->userIdLengths as $userLen) {
 
-        $layouts = [
-            ['verify' => 11, 'status' => 12, 'time' => 12],
-            ['verify' => 11, 'status' => 12, 'time' => 13],
-            ['verify' => 12, 'status' => 11, 'time' => 12],
-        ];
-
-        foreach ($layouts as $layout) {
-
-            if (! isset($chunk[$layout['time'] + 3])) {
+            if ($len < (2 + $userLen + 6)) {
                 continue;
             }
 
-            $timeRaw = unpack('V', substr($chunk, $layout['time'], 4))[1] ?? null;
+            $user_id = $this->cleanString(substr($chunk, 2, $userLen));
+
+            if (! $user_id) {
+                continue;
+            }
+
+            $verifyIndex = 2 + $userLen;
+            $statusIndex = $verifyIndex + 1;
+            $timeIndex = $statusIndex + 1;
+
+            if (! isset($chunk[$timeIndex + 3])) {
+                continue;
+            }
+
+            $timeRaw = unpack('V', substr($chunk, $timeIndex, 4))[1] ?? null;
 
             $timestamp = $this->decodeTime($timeRaw);
 
-            if ($this->isValidTime($timestamp)) {
-
-                return [
-                    'uid' => $uid,
-                    'user_id' => $user_id,
-                    'timestamp' => $timestamp,
-                    'status' => ord($chunk[$layout['status']] ?? 0),
-                    'verify_type' => ord($chunk[$layout['verify']] ?? 0),
-                    'stamp' => $this->extractStamp($chunk),
-                ];
+            if (! $this->isValidTime($timestamp)) {
+                continue;
             }
+
+            return [
+                'uid' => $uid,
+                'user_id' => $user_id,
+                'timestamp' => $timestamp,
+                'status' => ord($chunk[$statusIndex] ?? 0),
+                'verify_type' => ord($chunk[$verifyIndex] ?? 0),
+                'raw_hex' => bin2hex($chunk), // debug ready
+            ];
         }
 
         return null;
     }
 
-    protected function extractStamp($chunk)
+    protected function scoreRecords($records)
     {
-        if (strlen($chunk) >= 20) {
-            $bytes = substr($chunk, -4);
+        $score = 0;
 
-            if (strlen($bytes) === 4) {
-                return unpack('V', $bytes)[1] ?? null;
+        foreach ($records as $r) {
+
+            if (! $r['user_id']) {
+                continue;
+            }
+
+            // ✔ valid user_id
+            if (strlen($r['user_id']) >= 3) {
+                $score += 2;
+            }
+
+            // ✔ realistic timestamp
+            if ($this->isValidTime($r['timestamp'])) {
+                $score += 3;
+            }
+
+            // ✔ valid status
+            if ($r['status'] >= 0 && $r['status'] <= 5) {
+                $score += 1;
+            }
+
+            // ✔ valid verify_type
+            if (in_array($r['verify_type'], [0, 1, 2, 15])) {
+                $score += 1;
             }
         }
 
-        return null;
+        return $score;
     }
 
     protected function decodeTime($time)
@@ -149,13 +153,14 @@ class ZKTecoParser
             return null;
         }
 
-        $t = Carbon::create(2000, 1, 1)->addSeconds($time);
+        return Carbon::create(2000, 1, 1)->addSeconds($time);
+    }
 
-        if ($this->isValidTime($t)) {
-            return $t;
-        }
-
-        return null;
+    protected function isValidTime($time)
+    {
+        return $time &&
+            $time->year >= 2000 &&
+            $time->year <= now()->year + 1;
     }
 
     protected function cleanString($value)
@@ -165,15 +170,7 @@ class ZKTecoParser
         }
 
         $value = str_replace("\0", '', $value);
-        $value = iconv('UTF-8', 'UTF-8//IGNORE', $value);
 
         return trim(preg_replace('/[^\x20-\x7E]/', '', $value));
-    }
-
-    protected function isValidTime($time)
-    {
-        return $time &&
-            $time->year >= 2000 &&
-            $time->year <= now()->year + 1;
     }
 }
