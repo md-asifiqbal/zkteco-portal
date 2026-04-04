@@ -38,6 +38,7 @@ class SyncPullPunchLog implements ShouldQueue
                 'stamp' => $this->device->last_stamp ?? 0,
                 'created_at' => $now,
                 'updated_at' => $now,
+                'source' => 2, // 1: push, 2: pull
             ])
             ->values()
             ->all();
@@ -47,7 +48,7 @@ class SyncPullPunchLog implements ShouldQueue
             PunchLog::upsert(
                 $payload,
                 ['device_id', 'user_id', 'timestamp'], // unique keys
-                ['status', 'verify_type', 'stamp', 'updated_at']
+                ['status', 'verify_type', 'stamp', 'updated_at', 'source']
             );
         }
     }
