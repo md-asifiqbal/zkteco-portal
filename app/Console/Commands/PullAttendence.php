@@ -27,7 +27,7 @@ class PullAttendence extends Command
                 return Command::FAILURE;
             }
             $service = $factory->make($device);
-            $logs = $service->syncAttendance($device->id);
+            $logs = $service->syncUsers();
             dd(collect($logs)->take(2)->toArray());
         }
 
