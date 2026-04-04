@@ -35,7 +35,8 @@ class SyncDeviceLogsJob implements ShouldQueue
                 'count' => count($logs),
             ]);
 
-            SyncPullPunchLog::dispatch($device, $logs);
+            dispatch(new SyncPullPunchLog($device, $logs));
+
 
         } catch (\Throwable $e) {
 

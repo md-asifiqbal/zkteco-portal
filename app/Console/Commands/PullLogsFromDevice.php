@@ -25,8 +25,7 @@ class PullLogsFromDevice extends Command
             ->chunk(5, function ($devices) {
 
                 foreach ($devices as $device) {
-
-                    SyncDeviceLogsJob::dispatch($device->id);
+                    dispatch(new SyncDeviceLogsJob($device->id));
 
                     $this->line("Queued device: {$device->ip_address}");
                 }
