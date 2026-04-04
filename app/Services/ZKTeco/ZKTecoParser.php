@@ -3,6 +3,7 @@
 namespace App\Services\ZKTeco;
 
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class ZKTecoParser
 {
@@ -18,10 +19,22 @@ class ZKTecoParser
 
             $chunk = substr($data, $offset, $recordSize);
 
-            $parsed = $this->parseChunk($chunk, $recordSize);
+            if (strlen($chunk) < $recordSize) {
+                break;
+            }
 
-            if ($parsed) {
-                $records[] = $parsed;
+            try {
+                $parsed = $this->parseChunk($chunk);
+
+                if ($parsed) {
+                    $records[] = $parsed;
+                }
+
+            } catch (\Throwable $e) {
+                Log::warning('Parser error', [
+                    'error' => $e->getMessage(),
+                    'hex' => bin2hex($chunk),
+                ]);
             }
 
             $offset += $recordSize;
@@ -30,26 +43,61 @@ class ZKTecoParser
         return $records;
     }
 
-    // 🔍 Detect record size dynamically
     protected function detectRecordSize($data)
     {
-        foreach ([16, 18, 24] as $size) {
-            if (strlen($data) % $size === 0) {
+        $length = strlen($data);
+
+        foreach ([16, 18, 24, 40] as $size) {
+
+            $valid = 0;
+            $checks = 0;
+
+            for ($i = 0; $i + $size <= $length && $checks < 5; $i += $size) {
+
+                $chunk = substr($data, $i, $size);
+
+                if ($this->looksValidChunk($chunk)) {
+                    $valid++;
+                }
+
+                $checks++;
+            }
+
+            if ($valid >= 3) {
                 return $size;
             }
         }
 
-        return 16; // fallback
+        return 16;
     }
 
-    protected function parseChunk($chunk, $size)
+    protected function looksValidChunk($chunk)
     {
+        if (strlen($chunk) < 16) {
+            return false;
+        }
+
+        $timeBytes = substr($chunk, 12, 4);
+
+        if (strlen($timeBytes) < 4) {
+            return false;
+        }
+
+        $time = unpack('V', $timeBytes)[1] ?? null;
+
+        return $this->isValidTime($this->decodeTime($time));
+    }
+
+    protected function parseChunk($chunk)
+    {
+        if (strlen($chunk) < 16) {
+            return null;
+        }
+
         $uid = unpack('v', substr($chunk, 0, 2))[1] ?? null;
 
-        $userRaw = substr($chunk, 2, 9);
-        $user_id = $this->cleanString($userRaw);
+        $user_id = $this->cleanString(substr($chunk, 2, 9));
 
-        // 🔥 Try both layouts
         $layouts = [
             ['verify' => 11, 'status' => 12, 'time' => 12],
             ['verify' => 11, 'status' => 12, 'time' => 13],
@@ -58,25 +106,41 @@ class ZKTecoParser
 
         foreach ($layouts as $layout) {
 
-            $verify_type = ord($chunk[$layout['verify']] ?? 0);
-            $status = ord($chunk[$layout['status']] ?? 0);
+            if (! isset($chunk[$layout['time'] + 3])) {
+                continue;
+            }
 
             $timeRaw = unpack('V', substr($chunk, $layout['time'], 4))[1] ?? null;
 
             $timestamp = $this->decodeTime($timeRaw);
 
             if ($this->isValidTime($timestamp)) {
+
                 return [
                     'uid' => $uid,
                     'user_id' => $user_id,
                     'timestamp' => $timestamp,
-                    'status' => $status,
-                    'verify_type' => $verify_type,
+                    'status' => ord($chunk[$layout['status']] ?? 0),
+                    'verify_type' => ord($chunk[$layout['verify']] ?? 0),
+                    'stamp' => $this->extractStamp($chunk),
                 ];
             }
         }
 
-        return null; // skip invalid record
+        return null;
+    }
+
+    protected function extractStamp($chunk)
+    {
+        if (strlen($chunk) >= 20) {
+            $bytes = substr($chunk, -4);
+
+            if (strlen($bytes) === 4) {
+                return unpack('V', $bytes)[1] ?? null;
+            }
+        }
+
+        return null;
     }
 
     protected function decodeTime($time)
@@ -85,33 +149,31 @@ class ZKTecoParser
             return null;
         }
 
-        return Carbon::create(2000, 1, 1)->addSeconds($time);
+        $t = Carbon::create(2000, 1, 1)->addSeconds($time);
+
+        if ($this->isValidTime($t)) {
+            return $t;
+        }
+
+        return null;
     }
 
-    // 🔥 Smart string cleaner (multi-encoding)
     protected function cleanString($value)
     {
         if (! $value) {
             return null;
         }
 
-        // Try UTF-8 first
-        $value = @mb_convert_encoding($value, 'UTF-8', 'UTF-8');
-
-        // Try GBK → UTF-8 (common in ZKTeco)
-        $value = @mb_convert_encoding($value, 'UTF-8', 'GBK');
-
-        // Remove null bytes
         $value = str_replace("\0", '', $value);
+        $value = iconv('UTF-8', 'UTF-8//IGNORE', $value);
 
-        // Remove garbage characters
         return trim(preg_replace('/[^\x20-\x7E]/', '', $value));
     }
 
     protected function isValidTime($time)
     {
         return $time &&
-               $time->year >= 2000 &&
-               $time->year <= now()->year + 1;
+            $time->year >= 2000 &&
+            $time->year <= now()->year + 1;
     }
 }
