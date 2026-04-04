@@ -151,6 +151,7 @@ class ZKTecoService
                 'user_id' => trim(str_replace("\0", '', substr($chunk, 2, 9))),
                 'name' => trim(str_replace("\0", '', substr($chunk, 11, 24))),
                 'role' => ord($chunk[35] ?? 0),
+                'raw_hex' => bin2hex($chunk),
             ];
         }
 
