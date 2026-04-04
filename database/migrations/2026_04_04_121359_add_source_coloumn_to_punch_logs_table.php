@@ -14,7 +14,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('punch_logs', function (Blueprint $table) {
-            $table->string('source')->nullable()->after('stamp');
+            $table->tinyInteger('source')->nullable()->default(1)->after('stamp')->comment('1:push, 2:pull');
         });
     }
 
