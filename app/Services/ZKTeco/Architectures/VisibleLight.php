@@ -15,9 +15,20 @@ class VisibleLight implements ArchitectureInterface
             return null;
         }
 
+        $rawUid = unpack('V', substr($chunk, 0, 4))[1] ?? 0;
+        
+        // Visible Light devices often leave the old integer UID block as '0' and instead rely purely on the String ID.
+        // If it's 0, we can fallback to the numeric value of their string ID so your system doesn't break.
+        $userIdStr = $this->extractUserId($chunk);
+        if ($rawUid === 0 && is_numeric($userIdStr)) {
+            $uid = (int) $userIdStr;
+        } else {
+            $uid = $rawUid;
+        }
+
         return [
-            'uid' => unpack('v', substr($chunk, 0, 2))[1] ?? null,
-            'user_id' => $this->extractUserId($chunk),
+            'uid' => $uid,
+            'user_id' => $userIdStr,
             'name' => $this->cleanString(substr($chunk, 11, 24)),
             'role' => ord($chunk[35] ?? 0),
             'raw_hex' => bin2hex($chunk),

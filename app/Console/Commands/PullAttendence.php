@@ -29,7 +29,7 @@ class PullAttendence extends Command
             }
             $service = $factory->make($device);
 
-            $result = $service->createUser(10010, 'Mawdud Ahmed', 0);
+            $result = $service->createUser('SS-EMP-41', 'Asif', 0);
             Log::info('Create user result', [
                 'device_id' => $deviceId,
                 'result' => $result,
