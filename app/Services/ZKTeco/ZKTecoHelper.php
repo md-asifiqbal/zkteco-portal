@@ -89,28 +89,24 @@ class ZKTecoHelper
     public function createUser($uid, $name, $role = 0)
     {
         $packet = $this->architecture->buildUserPacket($uid, $name, $role);
-        $packetSize = strlen($packet); // Dynamic based on architecture
 
-        // 1. PREPARE - Tell device how much data is coming
-        $this->client->send(ZKTecoClient::CMD_PREPARE_DATA, pack('V', $packetSize));
-        $this->client->receive();
-
-        // 2. DATA - Send the actual 72 bytes
-        $this->client->send(ZKTecoClient::CMD_DATA, $packet);
-        $this->client->receive();
-
-        // 3. WRITE - Tell device to commit the data to flash memory
-        $this->client->send(ZKTecoClient::CMD_USER_WRQ);
+        // Command 8 (CMD_USER_WRQ) is the standard ZKTeco protocol for writing a user payload directly.
+        // The PREPARE_DATA sequence is generally for very large templates (like images), not 72-byte structs.
+        $this->client->send(8, $packet);
         $response = $this->client->receive();
+
+        if (empty($response) || strlen($response) < 8) {
+            throw new \Exception('User creation failed: No valid response from device.');
+        }
 
         $header = unpack('vcommand/vchecksum/vsession/vreply', substr($response, 0, 8));
 
-        if ($header['command'] != ZKTecoClient::CMD_ACK) {
+        // 2000 is CMD_ACK
+        if ($header['command'] != 2000) {
             throw new \Exception('User creation failed: '.$header['command']);
         }
 
         return true;
-
     }
 
 
