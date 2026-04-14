@@ -72,10 +72,10 @@ class ZKTecoClient
     {
         // 1. TRY UDP FIRST (Standard for most older/mixed ZK devices)
         $this->protocol = 'udp';
-        $this->socket = @fsockopen('udp://'.$this->ip, $this->port, $errno, $errstr, 2);
+        $this->socket = @fsockopen('udp://'.$this->ip, $this->port, $udpErrno, $udpErrstr, 5);
 
         if ($this->socket) {
-            stream_set_timeout($this->socket, 2);
+            stream_set_timeout($this->socket, 5);
             $this->send(self::CMD_CONNECT);
             $res = $this->receive();
 
@@ -89,10 +89,10 @@ class ZKTecoClient
 
         // 2. FALLBACK TO TCP (Modern F22, IFace, Visible Light firmwares)
         $this->protocol = 'tcp';
-        $this->socket = @fsockopen('tcp://'.$this->ip, $this->port, $errno, $errstr, 5);
+        $this->socket = @fsockopen('tcp://'.$this->ip, $this->port, $tcpErrno, $tcpErrstr, 5);
 
         if (! $this->socket) {
-            throw new \Exception("ZKTeco Connection failed: TCP Unreachable ($errstr)");
+            throw new \Exception("ZKTeco Connection failed entirely. UDP was attempted but returned zero bytes (device ignoring packets), and TCP fallback threw: $tcpErrstr");
         }
 
         stream_set_timeout($this->socket, 5);
@@ -101,7 +101,7 @@ class ZKTecoClient
         $res = $this->receive();
 
         if (empty($res) || strlen($res) < 8) {
-            throw new \Exception('No response from device. Check if Port 4370 is open or if a Comm Key is set.');
+            throw new \Exception('Connected successfully via TCP, but device gave no response to commands. Check Comm Key.');
         }
 
         $header = unpack('vcommand/vchecksum/vsession/vreply', substr($res, 0, 8));
