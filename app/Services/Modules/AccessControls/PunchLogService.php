@@ -17,7 +17,7 @@ class PunchLogService
     public function getLogs(?string $deviceId = null, array $filters = []): LengthAwarePaginator
     {
 
-        $query = $this->model::query()->where('tenant_id', tenant_id());
+        $query = $this->model::query()->with('device')->where('tenant_id', tenant_id());
 
         if ($deviceId) {
             $query->where('device_id', $deviceId);

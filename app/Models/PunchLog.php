@@ -9,4 +9,9 @@ class PunchLog extends Model
     protected $connection = 'logs_db';
 
     protected $guarded = [];
+
+    public function device()
+    {
+        return $this->belongsTo(Device::class, 'device_id');
+    }
 }
