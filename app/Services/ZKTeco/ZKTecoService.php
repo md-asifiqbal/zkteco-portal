@@ -74,11 +74,11 @@ class ZKTecoService
         try {
             $this->client->connect();
 
-            $this->helper->createUser($uid, $userId, $name, $password, $role);
+            $result = $this->helper->createUser($uid, $userId, $name, $password, $role);
 
             $this->client->disconnect();
 
-            return true;
+            return $result;
 
         } catch (\Throwable $e) {
             Log::error('ZK Create User Error', [
