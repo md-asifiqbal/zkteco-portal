@@ -84,6 +84,47 @@ class ZKTecoHelper
         return $this->execute(ZKTecoClient::CMD_USER_RRQ);
     }
 
+    public function createUser($uid, $userId, $name, $password = '', $role = 0)
+    {
+        $data = $this->buildUserPacket($uid, $userId, $name, $password, $role);
+
+        return $this->execute(ZKTecoClient::CMD_USER_WRQ, $data);
+    }
+
+    protected function buildUserPacket($uid, $userId, $name, $password, $role)
+    {
+        // UID (2 bytes)
+        $uidPack = pack('v', $uid);
+
+        // Role (1 byte)
+        $rolePack = chr($role);
+
+        // Password (8 bytes)
+        $passwordPack = str_pad(substr($password, 0, 8), 8, "\0");
+
+        // Name (24 bytes)
+        $namePack = str_pad(substr($name, 0, 24), 24, "\0");
+
+        // User ID (9 bytes normally, but many devices accept 12–16)
+        $userIdPack = str_pad(substr($userId, 0, 12), 12, "\0");
+
+        // Padding to match 72 bytes total
+        $padding = str_repeat("\0", 72 - (
+            strlen($uidPack) +
+            strlen($rolePack) +
+            strlen($passwordPack) +
+            strlen($namePack) +
+            strlen($userIdPack)
+        ));
+
+        return $uidPack
+            .$rolePack
+            .$passwordPack
+            .$namePack
+            .$userIdPack
+            .$padding;
+    }
+
     /*
     |--------------------------------------------------------------------------
     | DEVICE

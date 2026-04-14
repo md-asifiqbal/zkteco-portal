@@ -69,6 +69,26 @@ class ZKTecoService
         return $this->parseUsers($raw);
     }
 
+    public function createUser($uid, $userId, $name, $password = '', $role = 0)
+    {
+        try {
+            $this->client->connect();
+
+            $this->helper->createUser($uid, $userId, $name, $password, $role);
+
+            $this->client->disconnect();
+
+            return true;
+
+        } catch (\Throwable $e) {
+            Log::error('ZK Create User Error', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
     /*
     |--------------------------------------------------------------------------
     | DEVICE COMMANDS
