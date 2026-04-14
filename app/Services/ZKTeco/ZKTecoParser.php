@@ -72,7 +72,24 @@ class ZKTecoParser
             return null;
         }
 
-        // ✅ UID
+        // 🟢 40-Byte Structural Parsing (Visible Light / IFace Firmwares)
+        if ($len == 40) {
+            $timeRaw = unpack('V', substr($chunk, 34, 4))[1] ?? null;
+            $timestamp = $this->decodeTime($timeRaw);
+
+            return [
+                'uid' => unpack('V', substr($chunk, 0, 4))[1] ?? 0,
+                // MB10-VL explicitly stores the Employee ID string starting at Offset 8
+                'user_id' => $this->cleanString(substr($chunk, 8, 24)), 
+                'timestamp' => $this->isValidTime($timestamp) ? $timestamp : null,
+                'status' => ord($chunk[33] ?? 0),
+                'verify_type' => ord($chunk[32] ?? 0),
+                'stamp' => $this->extractStamp($chunk),
+                'raw_hex' => bin2hex($chunk),
+            ];
+        }
+
+        // 🟡 Legacy Standard Parsing (16, 20, 24 bytes)
         $uid = unpack('v', substr($chunk, 0, 2))[1] ?? null;
 
         // 🔥 Try multiple offsets + lengths
