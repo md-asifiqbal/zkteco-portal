@@ -108,6 +108,10 @@ class ZKTecoHelper
             throw new \Exception('No response from device during createUser');
         }
 
+        $header = unpack('vcommand/vchecksum/vsession/vreply', substr($response, 0, 8));
+
+        dd($header);
+
         dd($response);
 
         return true;
