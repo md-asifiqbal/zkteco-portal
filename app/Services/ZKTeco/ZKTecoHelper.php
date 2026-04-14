@@ -87,16 +87,17 @@ class ZKTecoHelper
     public function createUser($uid, $name, $role = 0)
     {
         $packet = $this->buildUserPacket($uid, $name, $role);
+        $packetSize = strlen($packet); // Should be 72
 
-        // PREPARE
-        $this->client->send(ZKTecoClient::CMD_PREPARE_DATA, pack('V', strlen($packet)));
+        // 1. PREPARE - Tell device how much data is coming
+        $this->client->send(ZKTecoClient::CMD_PREPARE_DATA, pack('V', $packetSize));
         $this->client->receive();
 
-        // DATA
+        // 2. DATA - Send the actual 72 bytes
         $this->client->send(ZKTecoClient::CMD_DATA, $packet);
         $this->client->receive();
 
-        // WRITE
+        // 3. WRITE - Tell device to commit the data to flash memory
         $this->client->send(ZKTecoClient::CMD_USER_WRQ);
         $response = $this->client->receive();
 
@@ -107,18 +108,40 @@ class ZKTecoHelper
         }
 
         return true;
+
     }
 
     protected function buildUserPacket($uid, $name, $role = 0)
     {
-        return pack(
-            'v', $uid              // UID (2 bytes)
-        )
-        .str_repeat("\0", 8)     // unknown padding
-        .chr($role)              // role
-        .str_repeat("\0", 2)     // padding
-        .str_pad(substr($name, 0, 24), 24, "\0") // name
-        .str_repeat("\0", 3);    // tail padding
+        // Initialize a 72-byte buffer of null bytes
+        $packet = str_repeat("\x00", 72);
+
+        // 1. UID (2 bytes, Offset 0)
+        $uidBin = pack('v', $uid);
+        $packet[0] = $uidBin[0];
+        $packet[1] = $uidBin[1];
+
+        // 2. Role (1 byte, Offset 2) - Note: Some firmwares use offset 2, others 35
+        $packet[2] = chr($role);
+
+        // 3. Name (Offset 11, length 24)
+        $nameBin = str_pad(substr($name, 0, 24), 24, "\x00");
+        for ($i = 0; $i < 24; $i++) {
+            $packet[11 + $i] = $nameBin[$i];
+        }
+
+        // 4. User ID / Employee ID (Offset 40 or similar based on your hex)
+        // Looking at your log: "985d500001000001000000000031..."
+        // It seems your User ID "1" is at a specific offset.
+        $userId = (string) $uid; // Or pass a specific ID
+        $userIdBin = str_pad($userId, 9, "\x00"); // Standard length is 9 for many 72-byte devices
+
+        // Attempting to place User ID at offset 48 (common for this 72-byte variant)
+        for ($i = 0; $i < 9; $i++) {
+            $packet[48 + $i] = $userIdBin[$i];
+        }
+
+        return $packet;
     }
 
     /*
