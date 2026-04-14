@@ -86,43 +86,37 @@ class ZKTecoHelper
 
     public function createUser($uid, $userId, $name, $password = '', $role = 0)
     {
-        $data = $this->buildUserPacket($uid, $userId, $name, $password, $role);
+        $packet = $this->buildUserPacket($uid, $userId, $name, $password, $role);
 
-        return $this->execute(ZKTecoClient::CMD_USER_WRQ, $data);
+        // 1️⃣ Tell device we will send data
+        $this->client->send(ZKTecoClient::CMD_PREPARE_DATA, pack('V', strlen($packet)));
+        $this->client->receive();
+
+        // 2️⃣ Send actual data
+        $this->client->send(ZKTecoClient::CMD_DATA, $packet);
+        $this->client->receive();
+
+        // 3️⃣ Final write command
+        $this->client->send(ZKTecoClient::CMD_USER_WRQ);
+        $this->client->receive();
+
+        // 4️⃣ Free buffer
+        $this->client->send(ZKTecoClient::CMD_FREE_DATA);
+        $this->client->receive();
+
+        return true;
     }
 
     protected function buildUserPacket($uid, $userId, $name, $password, $role)
     {
-        // UID (2 bytes)
-        $uidPack = pack('v', $uid);
-
-        // Role (1 byte)
-        $rolePack = chr($role);
-
-        // Password (8 bytes)
-        $passwordPack = str_pad(substr($password, 0, 8), 8, "\0");
-
-        // Name (24 bytes)
-        $namePack = str_pad(substr($name, 0, 24), 24, "\0");
-
-        // User ID (9 bytes normally, but many devices accept 12–16)
-        $userIdPack = str_pad(substr($userId, 0, 12), 12, "\0");
-
-        // Padding to match 72 bytes total
-        $padding = str_repeat("\0", 72 - (
-            strlen($uidPack) +
-            strlen($rolePack) +
-            strlen($passwordPack) +
-            strlen($namePack) +
-            strlen($userIdPack)
-        ));
-
-        return $uidPack
-            .$rolePack
-            .$passwordPack
-            .$namePack
-            .$userIdPack
-            .$padding;
+        return pack(
+            'vZ8Z24Z8Z16',
+            $uid,           // UID
+            $userId,        // User ID (8 bytes typical)
+            $name,          // Name (24)
+            $password,      // Password (8)
+            ''              // Card / padding
+        ).chr($role);     // Role at end
     }
 
     /*
