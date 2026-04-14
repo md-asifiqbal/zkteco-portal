@@ -5,10 +5,12 @@ namespace App\Services\ZKTeco;
 class ZKTecoHelper
 {
     protected $client;
+    protected $architecture;
 
-    public function __construct(ZKTecoClient $client)
+    public function __construct(ZKTecoClient $client, Architectures\ArchitectureInterface $architecture)
     {
         $this->client = $client;
+        $this->architecture = $architecture;
     }
 
     /*
@@ -86,8 +88,8 @@ class ZKTecoHelper
 
     public function createUser($uid, $name, $role = 0)
     {
-        $packet = $this->buildUserPacket($uid, $name, $role);
-        $packetSize = strlen($packet); // Should be 72
+        $packet = $this->architecture->buildUserPacket($uid, $name, $role);
+        $packetSize = strlen($packet); // Dynamic based on architecture
 
         // 1. PREPARE - Tell device how much data is coming
         $this->client->send(ZKTecoClient::CMD_PREPARE_DATA, pack('V', $packetSize));
@@ -111,38 +113,6 @@ class ZKTecoHelper
 
     }
 
-    protected function buildUserPacket($uid, $name, $role = 0)
-    {
-        // Initialize a 72-byte buffer of null bytes
-        $packet = str_repeat("\x00", 72);
-
-        // 1. UID (2 bytes, Offset 0)
-        $uidBin = pack('v', $uid);
-        $packet[0] = $uidBin[0];
-        $packet[1] = $uidBin[1];
-
-        // 2. Role (1 byte, Offset 2) - Note: Some firmwares use offset 2, others 35
-        $packet[2] = chr($role);
-
-        // 3. Name (Offset 11, length 24)
-        $nameBin = str_pad(substr($name, 0, 24), 24, "\x00");
-        for ($i = 0; $i < 24; $i++) {
-            $packet[11 + $i] = $nameBin[$i];
-        }
-
-        // 4. User ID / Employee ID (Offset 40 or similar based on your hex)
-        // Looking at your log: "985d500001000001000000000031..."
-        // It seems your User ID "1" is at a specific offset.
-        $userId = (string) $uid; // Or pass a specific ID
-        $userIdBin = str_pad($userId, 9, "\x00"); // Standard length is 9 for many 72-byte devices
-
-        // Attempting to place User ID at offset 48 (common for this 72-byte variant)
-        for ($i = 0; $i < 9; $i++) {
-            $packet[48 + $i] = $userIdBin[$i];
-        }
-
-        return $packet;
-    }
 
     /*
     |--------------------------------------------------------------------------

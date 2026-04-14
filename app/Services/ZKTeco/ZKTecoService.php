@@ -12,14 +12,18 @@ class ZKTecoService
 
     protected $helper;
 
+    protected $architecture;
+
     public function __construct(
         ZKTecoClient $client,
         ZKTecoParser $parser,
-        ZKTecoHelper $helper
+        ZKTecoHelper $helper,
+        Architectures\ArchitectureInterface $architecture
     ) {
         $this->client = $client;
         $this->parser = $parser;
         $this->helper = $helper;
+        $this->architecture = $architecture;
     }
 
     /*
@@ -158,58 +162,18 @@ class ZKTecoService
             return [];
         }
 
-        for ($i = 0; $i < strlen($data); $i += 72) {
+        $size = $this->architecture->getUserPacketSize();
 
-            $chunk = substr($data, $i, 72);
+        for ($i = 0; $i < strlen($data); $i += $size) {
 
-            if (strlen($chunk) < 72) {
-                continue;
+            $chunk = substr($data, $i, $size);
+
+            $parsed = $this->architecture->parseUserChunk($chunk);
+            if ($parsed) {
+                $users[] = $parsed;
             }
-
-            $users[] = [
-                'uid' => unpack('v', substr($chunk, 0, 2))[1] ?? null,
-
-                // 🔥 FIXED
-                'user_id' => $this->extractUserId($chunk),
-
-                'name' => $this->cleanString(substr($chunk, 11, 24)),
-
-                'role' => ord($chunk[35] ?? 0),
-
-                'raw_hex' => bin2hex($chunk),
-            ];
         }
 
         return $users;
-    }
-
-    protected function extractUserId($chunk)
-    {
-        $hex = bin2hex($chunk);
-
-        // look for "SS-EMP-" pattern
-        if (preg_match('/53532d454d502d[0-9]+/', $hex, $match)) {
-            return hex2bin($match[0]);
-        }
-
-        return null;
-    }
-
-    protected function cleanString($value)
-    {
-        if (! $value) {
-            return null;
-        }
-
-        // remove null bytes
-        $value = str_replace("\0", '', $value);
-
-        // remove non-printable characters
-        $value = preg_replace('/[^\x20-\x7E]/', '', $value);
-
-        // fix encoding issues
-        $value = iconv('UTF-8', 'UTF-8//IGNORE', $value);
-
-        return trim($value);
     }
 }
