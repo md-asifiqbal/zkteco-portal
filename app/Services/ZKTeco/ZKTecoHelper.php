@@ -102,7 +102,13 @@ class ZKTecoHelper
 
         // 4️⃣ Free buffer
         $this->client->send(ZKTecoClient::CMD_FREE_DATA);
-        $this->client->receive();
+        $response = $this->client->receive();
+
+        if (! $response) {
+            throw new \Exception('No response from device during createUser');
+        }
+
+        dd($response);
 
         return true;
     }
