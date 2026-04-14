@@ -21,14 +21,10 @@ class ZKTecoParser
             'records' => [],
         ];
 
-        $sizes = $this->recordSizes;
-        if ($architecture) {
-            if (basename(str_replace('\\', '/', get_class($architecture))) === 'VisibleLight') {
-                $sizes = [40, 52]; // Strictly slice visible light at 40-byte / 52-byte structures
-            } else {
-                $sizes = [16, 20, 24, 32, 36]; // Standard sizes
-            }
-        }
+        // We've improved the Negative-Scoring penalty to be so deadly accurate 
+        // that we don't even need the Database to tell us what size it is!
+        // We will just scan all historical ZKTeco sizes and let the best one win naturally.
+        $sizes = [16, 20, 24, 32, 36, 40, 52];
 
         foreach ($sizes as $size) {
 
