@@ -31,6 +31,13 @@ class ZKTecoHelper
 
         $header = unpack('vcommand/vchecksum/vsession/vreply', substr($response, 0, 8));
 
+        // Let's catch if the device actively rejects our request!
+        if ($header['command'] === 2005) {
+            throw new \Exception('Device rejected command: Unauthorized (Comm Key / Password required!)');
+        } elseif ($header['command'] === 2001) {
+            throw new \Exception('Device rejected command: General Error (2001)');
+        }
+
         if ($header['command'] == ZKTecoClient::CMD_PREPARE_DATA) {
             return $this->readMultiPacket();
         }
