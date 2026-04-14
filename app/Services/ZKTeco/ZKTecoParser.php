@@ -185,16 +185,24 @@ class ZKTecoParser
                 $score += 2;
             }
 
-            if ($this->isValidTime($r['timestamp'])) {
-                $score += 3;
-            }
-
+            // Valid status in ZKTeco is usually 0 (CheckIn), 1 (CheckOut), 2 (BreakIn), 3 (BreakOut), 4 (OTIn), 5 (OTOut)
             if ($r['status'] >= 0 && $r['status'] <= 5) {
-                $score += 1;
+                $score += 2;
+            } else {
+                $score -= 15; // Massive penalty for garbage like '80'
             }
 
-            if (in_array($r['verify_type'], [0, 1, 2, 15])) {
-                $score += 1;
+            // Valid Verify in ZK is 0(Pass), 1(Finger), 2(PIN), 3(Card), 4(Face), 15(Face/Palm), etc.
+            if (in_array($r['verify_type'], [0, 1, 2, 3, 4, 15, 7, 20])) {
+                $score += 2;
+            } else {
+                $score -= 15; // Massive penalty for garbage like '77'
+            }
+
+            if ($this->isValidTime($r['timestamp'])) {
+                $score += 2;
+            } else {
+                $score -= 10;
             }
         }
 
