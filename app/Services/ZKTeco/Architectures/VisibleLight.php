@@ -33,9 +33,8 @@ class VisibleLight implements ArchitectureInterface
         $packet[0] = $uidBin[0];
         $packet[1] = $uidBin[1];
 
-        // 2. Role (Offset 2 and 35)
+        // 2. Role (1 byte, Offset 2)
         $packet[2] = chr($role);
-        $packet[35] = chr($role);
 
         // 3. Name (Offset 11, length 24)
         $nameBin = str_pad(substr($name, 0, 24), 24, "\x00");
@@ -43,10 +42,10 @@ class VisibleLight implements ArchitectureInterface
             $packet[11 + $i] = $nameBin[$i];
         }
 
-        // 4. User ID (Offset 48 length 24 for 72-byte)
+        // 4. User ID / Employee ID (Standard length is 9 for many 72-byte devices)
         $userId = $userId ?: (string) $uid;
-        $userIdBin = str_pad(substr($userId, 0, 24), 24, "\x00");
-        for ($i = 0; $i < 24; $i++) {
+        $userIdBin = str_pad(substr($userId, 0, 9), 9, "\x00"); 
+        for ($i = 0; $i < 9; $i++) {
             $packet[48 + $i] = $userIdBin[$i];
         }
 
