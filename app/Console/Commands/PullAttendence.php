@@ -35,6 +35,11 @@ class PullAttendence extends Command
                 'logs_count' => count($logs),
                 'users' => $logs,
             ]);
+
+            foreach ($logs as $log) {
+                dd($log);
+            }
+
             $this->info("Pulled attendance for device ID {$deviceId}. Logs count: ".count($logs));
         }
 
