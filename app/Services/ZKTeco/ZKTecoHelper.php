@@ -98,7 +98,7 @@ class ZKTecoHelper
         }
 
         $header = unpack('vcommand/vchecksum/vsession/vreply', substr($response, 0, 8));
-
+        dd($response);
         if ($header['command'] != ZKTecoClient::CMD_ACK) {
             throw new \Exception('User creation failed');
         }
