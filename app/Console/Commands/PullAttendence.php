@@ -29,7 +29,7 @@ class PullAttendence extends Command
             }
             $service = $factory->make($device);
 
-            $logs = $service->syncUsers();
+            $logs = $service->syncAttendance($device->id);
             Log::info('Pulled attendance for device', [
                 'device_id' => $deviceId,
                 'logs_count' => count($logs),
