@@ -29,20 +29,6 @@ class PullAttendence extends Command
             }
             $service = $factory->make($device);
 
-            $result = $service->createUser(41, 'Asif', 0);
-            Log::info('Create user result', [
-                'device_id' => $deviceId,
-                'result' => $result,
-            ]);
-            if ($result) {
-                Log::info('User created successfully', [
-                    'device_id' => $deviceId,
-                ]);
-                $this->info("User created successfully for device ID {$deviceId}.");
-            } else {
-                $this->error("Failed to create user for device ID {$deviceId}.");
-            }
-
             $logs = $service->syncUsers();
             Log::info('Pulled attendance for device', [
                 'device_id' => $deviceId,
