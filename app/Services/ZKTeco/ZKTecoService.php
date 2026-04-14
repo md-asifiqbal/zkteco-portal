@@ -72,7 +72,6 @@ class ZKTecoService
     public function createUser($uid, $userId, $name, $password = '', $role = 0)
     {
         try {
-            dd($this->checkSSR());
             $this->client->connect();
 
             $result = $this->helper->createUser($uid, $userId, $name, $password, $role);

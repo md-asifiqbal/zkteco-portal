@@ -2,6 +2,8 @@
 
 namespace App\Services\ZKTeco;
 
+use Illuminate\Support\Facades\Log;
+
 class ZKTecoHelper
 {
     protected $client;
@@ -86,8 +88,11 @@ class ZKTecoHelper
 
     public function createUser($uid, $userId, $name, $password = '', $role = 0)
     {
-        // SSR format command string
-        $data = "USER PIN={$userId}\tName={$name}\tPri={$role}\tPasswd={$password}\tCard=0";
+        // ✅ safest SSR format
+        $data = "PIN={$userId}\tName={$name}\tPri={$role}\tPasswd={$password}\tCard=0";
+
+        // ✅ VERY IMPORTANT: add null terminator
+        $data .= "\0";
 
         $this->client->send(ZKTecoClient::CMD_USER_WRQ, $data);
 
@@ -98,12 +103,13 @@ class ZKTecoHelper
         }
 
         $header = unpack('vcommand/vchecksum/vsession/vreply', substr($response, 0, 8));
-        dd($header);
-        if ($header['command'] != ZKTecoClient::CMD_ACK) {
-            throw new \Exception('User creation failed');
-        }
 
-        dd($response);
+        // DEBUG
+        Log::info('ZK create user response', $header);
+
+        if ($header['command'] != ZKTecoClient::CMD_ACK) {
+            throw new \Exception('User creation failed: '.$header['command']);
+        }
 
         return true;
     }
