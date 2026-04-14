@@ -2,8 +2,6 @@
 
 namespace App\Services\ZKTeco;
 
-use Illuminate\Support\Facades\Log;
-
 class ZKTecoHelper
 {
     protected $client;
@@ -86,26 +84,23 @@ class ZKTecoHelper
         return $this->execute(ZKTecoClient::CMD_USER_RRQ);
     }
 
-    public function createUser($uid, $userId, $name, $password = '', $role = 0)
+    public function createUser($uid, $name, $role = 0)
     {
-        // ✅ safest SSR format
-        $data = "PIN={$userId}\tName={$name}\tPri={$role}\tPasswd={$password}\tCard=0";
+        $packet = $this->buildUserPacket($uid, $name, $role);
 
-        // ✅ VERY IMPORTANT: add null terminator
-        $data .= "\0";
+        // PREPARE
+        $this->client->send(ZKTecoClient::CMD_PREPARE_DATA, pack('V', strlen($packet)));
+        $this->client->receive();
 
-        $this->client->send(ZKTecoClient::CMD_USER_WRQ, $data);
+        // DATA
+        $this->client->send(ZKTecoClient::CMD_DATA, $packet);
+        $this->client->receive();
 
+        // WRITE
+        $this->client->send(ZKTecoClient::CMD_USER_WRQ);
         $response = $this->client->receive();
 
-        if (! $response || strlen($response) < 8) {
-            throw new \Exception('No response from device');
-        }
-
         $header = unpack('vcommand/vchecksum/vsession/vreply', substr($response, 0, 8));
-
-        // DEBUG
-        Log::info('ZK create user response', $header);
 
         if ($header['command'] != ZKTecoClient::CMD_ACK) {
             throw new \Exception('User creation failed: '.$header['command']);
@@ -114,16 +109,16 @@ class ZKTecoHelper
         return true;
     }
 
-    protected function buildUserPacket($uid, $userId, $name, $password, $role)
+    protected function buildUserPacket($uid, $name, $role = 0)
     {
         return pack(
-            'vZ8Z24Z8Z16',
-            $uid,           // UID
-            $userId,        // User ID (8 bytes typical)
-            $name,          // Name (24)
-            $password,      // Password (8)
-            ''              // Card / padding
-        ).chr($role);     // Role at end
+            'v', $uid              // UID (2 bytes)
+        )
+        .str_repeat("\0", 8)     // unknown padding
+        .chr($role)              // role
+        .str_repeat("\0", 2)     // padding
+        .str_pad(substr($name, 0, 24), 24, "\0") // name
+        .str_repeat("\0", 3);    // tail padding
     }
 
     /*

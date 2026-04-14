@@ -69,12 +69,12 @@ class ZKTecoService
         return $this->parseUsers($raw);
     }
 
-    public function createUser($uid, $userId, $name, $password = '', $role = 0)
+    public function createUser($uid, $name, $role = 0)
     {
         try {
             $this->client->connect();
 
-            $result = $this->helper->createUser($uid, $userId, $name, $password, $role);
+            $result = $this->helper->createUser($uid, $name, $role);
 
             $this->client->disconnect();
 
