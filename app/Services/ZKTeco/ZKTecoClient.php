@@ -14,6 +14,8 @@ class ZKTecoClient
 
     public $reply_id = 0;
 
+    public $protocol = 'udp';
+
     const CMD_CONNECT = 1000;
 
     const CMD_EXIT = 1001;
@@ -68,11 +70,29 @@ class ZKTecoClient
 
     public function connect()
     {
-        // Use UDP (udp://) as it is the default for the ZK binary protocol
-        $this->socket = fsockopen('udp://'.$this->ip, $this->port, $errno, $errstr, 5);
+        // 1. TRY UDP FIRST (Standard for most older/mixed ZK devices)
+        $this->protocol = 'udp';
+        $this->socket = @fsockopen('udp://'.$this->ip, $this->port, $errno, $errstr, 2);
+
+        if ($this->socket) {
+            stream_set_timeout($this->socket, 2);
+            $this->send(self::CMD_CONNECT);
+            $res = $this->receive();
+
+            if ($res && strlen($res) >= 8) {
+                $header = unpack('vcommand/vchecksum/vsession/vreply', substr($res, 0, 8));
+                $this->session_id = $header['session'];
+                return true;
+            }
+            @fclose($this->socket);
+        }
+
+        // 2. FALLBACK TO TCP (Modern F22, IFace, Visible Light firmwares)
+        $this->protocol = 'tcp';
+        $this->socket = @fsockopen('tcp://'.$this->ip, $this->port, $errno, $errstr, 5);
 
         if (! $this->socket) {
-            throw new \Exception("ZKTeco Connection failed: $errstr ($errno)");
+            throw new \Exception("ZKTeco Connection failed: TCP Unreachable ($errstr)");
         }
 
         stream_set_timeout($this->socket, 5);
@@ -81,7 +101,7 @@ class ZKTecoClient
         $res = $this->receive();
 
         if (empty($res) || strlen($res) < 8) {
-            throw new \Exception('No response from device. Check if Port 4370 is open or if a Comm Key (Password) is set on the device.');
+            throw new \Exception('No response from device. Check if Port 4370 is open or if a Comm Key is set.');
         }
 
         $header = unpack('vcommand/vchecksum/vsession/vreply', substr($res, 0, 8));
@@ -100,29 +120,50 @@ class ZKTecoClient
 
     public function send($command, $data = '')
     {
-        // Increment reply ID for every packet sent
         $this->reply_id++;
         if ($this->reply_id >= 0xFFFF) {
             $this->reply_id = 0;
         }
 
-        // 1. Pack with 0 checksum to calculate the real one
         $buf = pack('vvvv', $command, 0, $this->session_id, $this->reply_id).$data;
-
-        // 2. Calculate Checksum
         $checksum = $this->createChecksum($buf);
-
-        // 3. Final Packet
         $packet = pack('vvvv', $command, $checksum, $this->session_id, $this->reply_id).$data;
+
+        if ($this->protocol === 'tcp') {
+            // TCP Envelope includes prepended \x50\x50\x82\x7d + Size
+            $sizePack = pack('V', strlen($packet));
+            $envelope = "\x50\x50\x82\x7d" . $sizePack;
+            $packet = $envelope . $packet;
+        }
 
         fwrite($this->socket, $packet);
     }
 
     public function receive()
     {
-        $data = fread($this->socket, 65535);
+        if ($this->protocol === 'tcp') {
+            // TCP stream requires unpacking the envelope header
+            $header = fread($this->socket, 8);
+            if (! $header || strlen($header) < 8) {
+                return false;
+            }
 
-        return $data;
+            // Extract the body size
+            $size = unpack('V', substr($header, 4, 4))[1];
+
+            $data = '';
+            while (strlen($data) < $size) {
+                $chunk = fread($this->socket, $size - strlen($data));
+                if ($chunk === false || strlen($chunk) == 0) {
+                    break;
+                }
+                $data .= $chunk;
+            }
+
+            return $data;
+        } else {
+            return fread($this->socket, 65535);
+        }
     }
 
     public function fetchAttendanceRaw()
