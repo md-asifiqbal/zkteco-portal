@@ -36,7 +36,7 @@ class ZKTecoClient
 
     const CMD_RESTART = 1003;
 
-    const CMD_USER_WRQ = 8;
+    const CMD_USER_WRQ = 10;
 
     public function __construct($ip, $port = 4370)
     {
