@@ -13,15 +13,24 @@ class ZKTecoParser
 
     protected $userLengths = [12, 9, 16];
 
-    public function parse($data)
+    public function parse($data, $architecture = null)
     {
         $best = [
             'size' => null,
-            'score' => 0,
+            'score' => -1,
             'records' => [],
         ];
 
-        foreach ($this->recordSizes as $size) {
+        $sizes = $this->recordSizes;
+        if ($architecture) {
+            if (basename(str_replace('\\', '/', get_class($architecture))) === 'VisibleLight') {
+                $sizes = [40, 52]; // Strictly slice visible light at 40-byte / 52-byte structures
+            } else {
+                $sizes = [16, 20, 24, 32, 36]; // Standard sizes
+            }
+        }
+
+        foreach ($sizes as $size) {
 
             $records = $this->parseWithSize($data, $size);
 

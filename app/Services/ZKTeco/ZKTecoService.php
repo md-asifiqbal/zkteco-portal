@@ -39,7 +39,12 @@ class ZKTecoService
 
             $raw = $this->helper->fetchAttendance();
 
-            $logs = $this->parser->parse($raw);
+            if (empty($raw)) {
+                $this->client->disconnect();
+                return [];
+            }
+
+            $logs = $this->parser->parse($raw, $this->architecture);
 
             $this->client->disconnect();
 
