@@ -86,31 +86,22 @@ class ZKTecoHelper
 
     public function createUser($uid, $userId, $name, $password = '', $role = 0)
     {
-        $packet = $this->buildUserPacket($uid, $userId, $name, $password, $role);
+        // SSR format command string
+        $data = "USER PIN={$userId}\tName={$name}\tPri={$role}\tPasswd={$password}\tCard=0";
 
-        // 1️⃣ Tell device we will send data
-        $this->client->send(ZKTecoClient::CMD_PREPARE_DATA, pack('V', strlen($packet)));
-        $this->client->receive();
+        $this->client->send(ZKTecoClient::CMD_USER_WRQ, $data);
 
-        // 2️⃣ Send actual data
-        $this->client->send(ZKTecoClient::CMD_DATA, $packet);
-        $this->client->receive();
-
-        // 3️⃣ Final write command
-        $this->client->send(ZKTecoClient::CMD_USER_WRQ);
-        $this->client->receive();
-
-        // 4️⃣ Free buffer
-        $this->client->send(ZKTecoClient::CMD_FREE_DATA);
         $response = $this->client->receive();
 
-        if (! $response) {
-            throw new \Exception('No response from device during createUser');
+        if (! $response || strlen($response) < 8) {
+            throw new \Exception('No response from device');
         }
 
         $header = unpack('vcommand/vchecksum/vsession/vreply', substr($response, 0, 8));
 
-        dd($header);
+        if ($header['command'] != ZKTecoClient::CMD_ACK) {
+            throw new \Exception('User creation failed');
+        }
 
         dd($response);
 
