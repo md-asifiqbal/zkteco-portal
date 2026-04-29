@@ -28,6 +28,8 @@ class PunchLogService
             $q->whereBetween('timestamp', [$startDate, $endDate]);
         })->when(isset($filters['source']), function ($q) use ($filters) {
             $q->where('source', $filters['source']);
+        })->when(isset($filters['search']), function ($q) use ($filters) {
+            $q->where('user_id', 'like', "%{$filters['search']}%");
         });
 
         if ($deviceId) {
