@@ -3,6 +3,7 @@
 namespace App\Services\Modules\AccessControls;
 
 use App\Models\PunchLog;
+use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class PunchLogService
@@ -22,7 +23,9 @@ class PunchLogService
         $query->when(isset($filters['user_id']), function ($q) use ($filters) {
             $q->where('user_id', $filters['user_id']);
         })->when(isset($filters['start_date']) && isset($filters['end_date']), function ($q) use ($filters) {
-            $q->whereBetween('timestamp', [$filters['start_date'], $filters['end_date']]);
+            $startDate = Carbon::parse($filters['start_date'])->startOfDay();
+            $endDate = Carbon::parse($filters['end_date'])->endOfDay();
+            $q->whereBetween('timestamp', [$startDate, $endDate]);
         })->when(isset($filters['source']), function ($q) use ($filters) {
             $q->where('source', $filters['source']);
         });
