@@ -82,6 +82,7 @@ class ZKTecoClient
             if ($res && strlen($res) >= 8) {
                 $header = unpack('vcommand/vchecksum/vsession/vreply', substr($res, 0, 8));
                 $this->session_id = $header['session'];
+
                 return true;
             }
             @fclose($this->socket);
@@ -132,8 +133,8 @@ class ZKTecoClient
         if ($this->protocol === 'tcp') {
             // TCP Envelope includes prepended \x50\x50\x82\x7d + Size
             $sizePack = pack('V', strlen($packet));
-            $envelope = "\x50\x50\x82\x7d" . $sizePack;
-            $packet = $envelope . $packet;
+            $envelope = "\x50\x50\x82\x7d".$sizePack;
+            $packet = $envelope.$packet;
         }
 
         fwrite($this->socket, $packet);
@@ -208,5 +209,41 @@ class ZKTecoClient
         }
 
         return $data;
+    }
+
+    public function setUserStatus($uid, $privilege = 0, $password = '', $name = '', $card = 0)
+    {
+        // The binary format for ZK user data (Standard 28-byte/72-byte structure depending on model)
+        // This is a simplified version compatible with most older and mid-range devices.
+        // Format: uid(v) + privilege(c) + password(8s) + name(24s) + card(V) + padding
+
+        // We pad the strings to ensure fixed length in the binary packet
+        $password = str_pad($password, 8, "\0");
+        $name = str_pad($name, 24, "\0");
+
+        // Construct the data payload
+        // 'v' = unsigned short (16 bit), 'c' = signed char (8 bit)
+        $data = pack('v', $uid).pack('c', $privilege).$password.$name.pack('V', $card).str_repeat("\0", 7);
+
+        $this->send(self::CMD_USER_WRQ, $data);
+        $res = $this->receive();
+
+        return $res ? true : false;
+    }
+
+    /**
+     * Disable a user (Interdict)
+     */
+    public function disableUser($uid)
+    {
+        return $this->setUserStatus($uid, 4); // 4 is the standard 'Disabled' flag
+    }
+
+    /**
+     * Enable a user (Set to Normal User)
+     */
+    public function enableUser($uid)
+    {
+        return $this->setUserStatus($uid, 0); // 0 is 'Normal User'
     }
 }

@@ -41,6 +41,7 @@ class ZKTecoService
 
             if (empty($raw)) {
                 $this->client->disconnect();
+
                 return [];
             }
 
@@ -126,6 +127,24 @@ class ZKTecoService
     {
         $this->client->connect();
         $res = $this->helper->clearAttendance();
+        $this->client->disconnect();
+
+        return $res;
+    }
+
+    public function disableEmployeeAccess($employeeId)
+    {
+        $this->client->connect();
+        $res = $this->helper->disableEmployeeAccess($employeeId);
+        $this->client->disconnect();
+
+        return $res;
+    }
+
+    public function enableEmployeeAccess($employeeId)
+    {
+        $this->client->connect();
+        $res = $this->helper->enableEmployeeAccess($employeeId);
         $this->client->disconnect();
 
         return $res;

@@ -2,7 +2,9 @@
 
 namespace App\Services\Modules\AccessControls;
 
+use App\Models\Device;
 use App\Models\PunchLog;
+use App\Services\ZKTeco\ZKTecoFactory;
 use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -37,5 +39,23 @@ class PunchLogService
         }
 
         return $query->latest()->paginate($filters['per_page'] ?? 10);
+    }
+
+    public function disabledEmployeeAccess(string $employeeId, array $filters = [])
+    {
+        $factory = app(ZKTecoFactory::class);
+        $devices = Device::where('tenant_id', tenant_id())->get();
+        foreach ($devices as $device) {
+            $service = $factory->make($device);
+            $data = $service->disableEmployeeAccess($employeeId);
+        }
+    }
+
+    public function enabledEmployeeAccess(string $employeeId, array $filters = [])
+    {
+        // Implement logic to enable employee access
+        // This could involve updating a database record or calling an external API
+        // For example:
+        // Employee::where('id', $employeeId)->update(['access_disabled' => false]);
     }
 }

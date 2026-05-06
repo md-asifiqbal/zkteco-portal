@@ -20,4 +20,23 @@ class PunchLogController extends Controller
             return ApiResponse::success(PunchLogResource::collection($data));
         });
     }
+
+    public function disabledEmployeeAccess(Request $request, string $employeeId)
+    {
+        return $this->handleRequest(function () use ($employeeId, $request) {
+
+            $data = $this->punchLogService->disabledEmployeeAccess($employeeId, $request->all());
+
+            return ApiResponse::success(['message' => "Employee access for ID {$employeeId} has been disabled."]);
+        });
+    }
+
+    public function enabledEmployeeAccess(Request $request, string $employeeId)
+    {
+        return $this->handleRequest(function () use ($employeeId, $request) {
+            $data = $this->punchLogService->enabledEmployeeAccess($employeeId, $request->all());
+
+            return ApiResponse::success(['message' => "Employee access for ID {$employeeId} has been enabled."]);
+        });
+    }
 }

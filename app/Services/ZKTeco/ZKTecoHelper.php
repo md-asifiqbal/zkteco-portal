@@ -5,6 +5,7 @@ namespace App\Services\ZKTeco;
 class ZKTecoHelper
 {
     protected $client;
+
     protected $architecture;
 
     public function __construct(ZKTecoClient $client, Architectures\ArchitectureInterface $architecture)
@@ -116,7 +117,6 @@ class ZKTecoHelper
         return true;
     }
 
-
     /*
     |--------------------------------------------------------------------------
     | DEVICE
@@ -141,5 +141,15 @@ class ZKTecoHelper
     public function restart()
     {
         return $this->execute(ZKTecoClient::CMD_RESTART);
+    }
+
+    public function disableEmployeeAccess($employeeId)
+    {
+        return $this->client->disableUser($employeeId);
+    }
+
+    public function enableEmployeeAccess($employeeId)
+    {
+        return $this->client->enableUser($employeeId);
     }
 }
