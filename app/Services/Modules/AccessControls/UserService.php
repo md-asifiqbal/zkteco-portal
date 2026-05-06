@@ -46,6 +46,7 @@ class UserService
             $data = $service->createUser($attributes['user_id'], $attributes['name'], $attributes['role'] ?? 0);
             $results[] = [
                 'device_id' => $device->ip_address,
+                'users' => $service->syncUsers(),
                 'data' => $data,
             ];
         } catch (\Throwable $e) {
