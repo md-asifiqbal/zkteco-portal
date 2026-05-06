@@ -11,7 +11,7 @@ class UserController extends Controller
 {
     public function __construct(protected UserService $userService) {}
 
-    public function getUsers(Request $request)
+    public function index(Request $request)
     {
         return $this->handleRequest(function () use ($request) {
             $data = $this->userService->getUsers($request->all());

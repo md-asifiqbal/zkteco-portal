@@ -14,7 +14,7 @@ class UserService
         $this->factory = $factory;
     }
 
-    public function index(array $filters = [])
+    public function getUsers(array $filters = [])
     {
         $devices = Device::where('tenant_id', tenant_id())->get();
         $results = [];
