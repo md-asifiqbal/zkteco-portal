@@ -26,13 +26,15 @@ class VisibleLight implements ArchitectureInterface
             $uid = $rawUid;
         }
 
+        $roleByte = ord($chunk[35] ?? 0);
+
         return [
             'uid' => $uid,
             'user_id' => $userIdStr,
             'name' => $this->cleanString(substr($chunk, 11, 24)),
             'role' => ord($chunk[35] ?? 0),
             'raw_hex' => bin2hex($chunk),
-            'enabled' => (ord($chunk[35] ?? 0) !== 0), // Assuming role byte also indicates enabled/disabled status
+            'enabled' => ! ($roleByte & 128),
         ];
     }
 
