@@ -42,6 +42,8 @@ class ZKTecoClient
 
     const CMD_USER_WRQ = 10;
 
+    const CMD_REFRESHDATA = 1013;
+
     public function __construct($ip, $port = 4370)
     {
         $this->ip = $ip;
@@ -213,25 +215,47 @@ class ZKTecoClient
         return $data;
     }
 
-    public function setUserStatus($uid, $privilege = 0, $password = '', $name = '', $card = 0)
+    public function setUserStatusAlphanumeric($user_id, $privilege = 0)
     {
-        // The binary format for ZK user data (Standard 28-byte/72-byte structure depending on model)
-        // This is a simplified version compatible with most older and mid-range devices.
-        // Format: uid(v) + privilege(c) + password(8s) + name(24s) + card(V) + padding
+        // 1. Try to extract a numeric index from the string,
+        // or use a dummy index if the device allows it.
+        // Many devices use the numeric part of the ID as the UID.
+        $numericPart = preg_replace('/[^0-9]/', '', $user_id);
+        $uid = $numericPart ? (int) $numericPart : 1;
 
-        // We pad the strings to ensure fixed length in the binary packet
-        $password = str_pad($password, 8, "\0");
-        $name = str_pad($name, 24, "\0");
+        // 2. Define the fixed-length components
+        $password = str_repeat("\0", 8);
+        $name = str_repeat("\0", 24);
+        $userIdStr = str_pad($user_id, 24, "\0"); // The alphanumeric ID
 
-        // Construct the data payload
-        // 'v' = unsigned short (16 bit), 'c' = signed char (8 bit)
-        $data = pack('v', $uid).pack('c', $privilege).$password.$name.pack('V', $card).str_repeat("\0", 7);
+        // 3. Construct the 72-byte (or 80-byte) Buffer
+        // Offset 0: UID (v)
+        // Offset 2: Privilege (c)
+        // Offset 3: Password (8s)
+        // Offset 11: Name (24s)
+        // Offset 35: Card/Other (4 bytes)
+        // Offset 39: The User ID String (This is critical for your device)
+
+        $data = pack('v', $uid)            // 2 bytes
+              .pack('c', $privilege)      // 1 byte
+              .$password                  // 8 bytes
+              .$name                      // 24 bytes
+              .pack('V', 0)               // 4 bytes (Card)
+              .pack('c', 1)               // 1 byte (User Enabled Flag - usually 1)
+              .$userIdStr                 // 24 bytes (The "SS-EMP-58" string)
+              .str_repeat("\0", 16);      // Final Padding to reach buffer size
 
         $this->send(self::CMD_USER_WRQ, $data);
         $res = $this->receive();
-        Log::debug('Set user status response: '.bin2hex($res));
 
-        return $res ? true : false;
+        Log::info('Set User Status Response: '.bin2hex($res));
+
+        // 4. Force a Refresh (Required for alphanumeric changes to take effect)
+
+        $this->send(self::CMD_REFRESHDATA);
+        $this->receive();
+
+        return $res;
     }
 
     /**
