@@ -2,6 +2,8 @@
 
 namespace App\Services\ZKTeco;
 
+use Illuminate\Support\Facades\Log;
+
 class ZKTecoClient
 {
     public $ip;
@@ -227,6 +229,7 @@ class ZKTecoClient
 
         $this->send(self::CMD_USER_WRQ, $data);
         $res = $this->receive();
+        Log::debug('Set user status response: '.bin2hex($res));
 
         return $res ? true : false;
     }
