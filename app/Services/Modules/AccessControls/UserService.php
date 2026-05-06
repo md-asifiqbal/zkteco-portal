@@ -37,6 +37,27 @@ class UserService
         return $results;
     }
 
+    public function createUser(array $attributes = [])
+    {
+        $device = Device::where('tenant_id', tenant_id())->where('id', $attributes['device_id'])->firstOrFail();
+
+        try {
+            $service = $this->factory->make($device);
+            $data = $service->createUser($attributes['user_id'], $attributes['name'], $attributes['role'] ?? 0);
+            $results[] = [
+                'device_id' => $device->ip_address,
+                'data' => $data,
+            ];
+        } catch (\Throwable $e) {
+            $results[] = [
+                'device_id' => $device->ip_address,
+                'error' => $e->getMessage(),
+            ];
+        }
+
+        return $results;
+    }
+
     public function disabledUser(string $employeeId, array $filters = [])
     {
         $factory = app(ZKTecoFactory::class);

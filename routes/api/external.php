@@ -10,8 +10,9 @@ Route::middleware('tenant')->group(function () {
     Route::prefix('access-controls')->group(function () {
         Route::post('{employeeId}/disabled', [UserController::class, 'disabledUser']);
         Route::post('{employeeId}/enabled', [UserController::class, 'enabledUser']);
-        Route::post('create-user', [UserController::class, 'createUser']);
         Route::get('users', [UserController::class, 'index']);
+        Route::post('users', [UserController::class, 'store']);
+
     });
 
 });

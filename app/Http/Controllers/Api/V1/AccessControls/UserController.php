@@ -20,6 +20,15 @@ class UserController extends Controller
         });
     }
 
+    public function store(Request $request)
+    {
+        return $this->handleRequest(function () use ($request) {
+            $data = $this->userService->createUser($request->all());
+
+            return ApiResponse::success($data);
+        });
+    }
+
     public function disabledUser(Request $request, string $userId)
     {
         return $this->handleRequest(function () use ($userId, $request) {
