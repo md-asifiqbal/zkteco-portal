@@ -16,7 +16,7 @@ class VisibleLight implements ArchitectureInterface
         }
 
         $rawUid = unpack('V', substr($chunk, 0, 4))[1] ?? 0;
-        
+
         // Visible Light devices often leave the old integer UID block as '0' and instead rely purely on the String ID.
         // If it's 0, we can fallback to the numeric value of their string ID so your system doesn't break.
         $userIdStr = $this->extractUserId($chunk);
@@ -32,6 +32,7 @@ class VisibleLight implements ArchitectureInterface
             'name' => $this->cleanString(substr($chunk, 11, 24)),
             'role' => ord($chunk[35] ?? 0),
             'raw_hex' => bin2hex($chunk),
+            'enabled' => (ord($chunk[35] ?? 0) !== 0), // Assuming role byte also indicates enabled/disabled status
         ];
     }
 
@@ -55,7 +56,7 @@ class VisibleLight implements ArchitectureInterface
 
         // 4. User ID / Employee ID (Standard length is 9 for many 72-byte devices)
         $userId = $userId ?: (string) $uid;
-        $userIdBin = str_pad(substr($userId, 0, 9), 9, "\x00"); 
+        $userIdBin = str_pad(substr($userId, 0, 9), 9, "\x00");
         for ($i = 0; $i < 9; $i++) {
             $packet[48 + $i] = $userIdBin[$i];
         }
@@ -74,7 +75,7 @@ class VisibleLight implements ArchitectureInterface
 
         // Normal visible light devices store string user id at offset 48
         $id = $this->cleanString(substr($chunk, 48, 24));
-        if (!empty($id)) {
+        if (! empty($id)) {
             return $id;
         }
 
@@ -83,7 +84,7 @@ class VisibleLight implements ArchitectureInterface
 
     protected function cleanString(?string $value): ?string
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
