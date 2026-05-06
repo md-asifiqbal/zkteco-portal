@@ -27,7 +27,7 @@ class PunchLogController extends Controller
 
             $data = $this->punchLogService->disabledEmployeeAccess($employeeId, $request->all());
 
-            return ApiResponse::success(['message' => "Employee access for ID {$employeeId} has been disabled."]);
+            return ApiResponse::success($data);
         });
     }
 
@@ -36,7 +36,7 @@ class PunchLogController extends Controller
         return $this->handleRequest(function () use ($employeeId, $request) {
             $data = $this->punchLogService->enabledEmployeeAccess($employeeId, $request->all());
 
-            return ApiResponse::success(['message' => "Employee access for ID {$employeeId} has been enabled."]);
+            return ApiResponse::success($data);
         });
     }
 }
