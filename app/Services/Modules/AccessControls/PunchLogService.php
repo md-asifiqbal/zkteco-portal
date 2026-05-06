@@ -45,10 +45,24 @@ class PunchLogService
     {
         $factory = app(ZKTecoFactory::class);
         $devices = Device::where('tenant_id', tenant_id())->get();
+        $results = [];
         foreach ($devices as $device) {
-            $service = $factory->make($device);
-            $data = $service->disableEmployeeAccess($employeeId);
+            try {
+                $service = $factory->make($device);
+                $data = $service->disableEmployeeAccess($employeeId);
+                $results[] = [
+                    'device_id' => $device->ip_address,
+                    'data' => $data,
+                ];
+            } catch (\Throwable $e) {
+                $results[] = [
+                    'device_id' => $device->ip_address,
+                    'error' => $e->getMessage(),
+                ];
+            }
         }
+
+        return $results;
     }
 
     public function enabledEmployeeAccess(string $employeeId, array $filters = [])
