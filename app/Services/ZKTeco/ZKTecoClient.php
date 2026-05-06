@@ -263,7 +263,7 @@ class ZKTecoClient
      */
     public function disableUser($uid)
     {
-        return $this->setUserStatus($uid, 4); // 4 is the standard 'Disabled' flag
+        return $this->setUserStatusAlphanumeric($uid, 4); // 4 is the standard 'Disabled' flag
     }
 
     /**
@@ -271,6 +271,6 @@ class ZKTecoClient
      */
     public function enableUser($uid)
     {
-        return $this->setUserStatus($uid, 0); // 0 is 'Normal User'
+        return $this->setUserStatusAlphanumeric($uid, 0); // 0 is 'Normal User'
     }
 }
