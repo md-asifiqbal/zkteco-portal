@@ -98,9 +98,9 @@ class ZKTecoHelper
     {
         $packet = $this->architecture->buildUserPacket($uid, $name, $role);
 
-        // Command 8 (CMD_USER_WRQ) is the standard ZKTeco protocol for writing a user payload directly.
+        // Use the defined CMD_USER_WRQ constant (avoid hardcoded values).
         // The PREPARE_DATA sequence is generally for very large templates (like images), not 72-byte structs.
-        $this->client->send(8, $packet);
+        $this->client->send(ZKTecoClient::CMD_USER_WRQ, $packet);
         $response = $this->client->receive();
 
         if (empty($response) || strlen($response) < 8) {

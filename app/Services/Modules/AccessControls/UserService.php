@@ -39,7 +39,7 @@ class UserService
 
     public function createUser(array $attributes = [])
     {
-        $device = Device::where('tenant_id', tenant_id())->where('id', $attributes['device_id'])->firstOrFail();
+        $device = Device::where('id', $attributes['device_id'])->firstOrFail();
 
         try {
             $service = $this->factory->make($device);
