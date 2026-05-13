@@ -2,6 +2,8 @@
 
 namespace App\Services\ZKTeco;
 
+use Illuminate\Support\Facades\Log;
+
 class ZKTecoHelper
 {
     protected $client;
@@ -98,21 +100,42 @@ class ZKTecoHelper
     {
         $packet = $this->architecture->buildUserPacket($uid, $name, $role);
 
-        // Use the defined CMD_USER_WRQ constant (avoid hardcoded values).
-        // The PREPARE_DATA sequence is generally for very large templates (like images), not 72-byte structs.
+        // Send and capture raw bytes for debugging if the device doesn't ACK
+        $sentHex = bin2hex($packet);
+
         $this->client->send(ZKTecoClient::CMD_USER_WRQ, $packet);
         $response = $this->client->receive();
 
         if (empty($response) || strlen($response) < 8) {
+            Log::error('ZK Create User No Response', [
+                'ip' => $this->client->ip,
+                'sent' => $sentHex,
+                'response' => null,
+            ]);
+
             throw new \Exception('User creation failed: No valid response from device.');
         }
 
         $header = unpack('vcommand/vchecksum/vsession/vreply', substr($response, 0, 8));
+        $resHex = bin2hex($response);
 
         // 2000 is CMD_ACK
-        if ($header['command'] != 2000) {
+        if ($header['command'] != ZKTecoClient::CMD_ACK) {
+            Log::error('ZK Create User Failed', [
+                'ip' => $this->client->ip,
+                'sent' => $sentHex,
+                'reply_command' => $header['command'],
+                'response' => $resHex,
+            ]);
+
             throw new \Exception('User creation failed: '.$header['command']);
         }
+
+        Log::info('ZK Create User ACK', [
+            'ip' => $this->client->ip,
+            'sent' => $sentHex,
+            'response' => $resHex,
+        ]);
 
         return true;
     }
